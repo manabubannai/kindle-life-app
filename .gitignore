@@ -1,0 +1,5 @@
+# claspの実接続情報（scriptIdは各自のもの。exampleを参照）
+.clasp.json
+
+.DS_Store
+node_modules/
