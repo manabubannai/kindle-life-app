@@ -12,10 +12,10 @@
 const SCRIPT_VERSION = '0.1.0';
 
 // 新版チェック先（GitHub公開時に実URLへ差し替える）
-const UPDATE_URL = 'https://raw.githubusercontent.com/GITHUB_USER/kindle-life-app/main/version.json';
+const UPDATE_URL = 'https://raw.githubusercontent.com/manabubannai/kindle-life-app/main/version.json';
 
 // エンドユーザー向けガイドのURL（公開時に差し替える）
-const GUIDE_URL = 'https://github.com/GITHUB_USER/kindle-life-app';
+const GUIDE_URL = 'https://github.com/manabubannai/kindle-life-app';
 
 // UIタブ（1枚だけ）
 const SHEET_MAIN = 'Kindle Life';
