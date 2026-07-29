@@ -6,6 +6,23 @@
  * （＝「① 初期セットアップ」が認証の入り口を兼ねる）。
  */
 
+/**
+ * シート上の説明文をコードの最新文言に合わせる（バージョンが変わった初回だけ書き込む）。
+ * 更新版のコードをpushしただけでシートの表示が古いまま、を毎時実行が自動で直す。
+ */
+function ensureSheetTexts_() {
+  if (getStateValue_('uiTextVersion') === SCRIPT_VERSION) return;
+  try {
+    const sheet = ss_().getSheetByName(SHEET_MAIN);
+    if (!sheet) return;
+    sheet.getRange('B3').setValue(SHEET_TAGLINE);
+    setStateValue_('uiTextVersion', SCRIPT_VERSION);
+    appendLog_('表示更新', 'シートの説明文を v' + SCRIPT_VERSION + ' の文言に更新', '');
+  } catch (e) {
+    console.error('説明文の更新失敗: ' + e);
+  }
+}
+
 function onOpen() {
   SpreadsheetApp.getUi()
     .createMenu('Kindle Life')

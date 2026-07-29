@@ -11,6 +11,7 @@
 /** 毎時トリガーから呼ばれる。 */
 function hourlyTick() {
   try {
+    ensureSheetTexts_(); // コード更新後、シートの説明文を1回だけ最新化
     runDelivery_();
     dailyUpdateCheck_(); // 1日1回だけ新版を照会
   } catch (e) {

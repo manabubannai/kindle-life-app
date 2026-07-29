@@ -20,6 +20,9 @@ const GUIDE_URL = 'https://github.com/manabubannai/kindle-life-app';
 // UIタブ（1枚だけ）
 const SHEET_MAIN = 'Kindle Life';
 
+// シート上部のキャッチコピー（B3）。dev.gsの構築と毎時の自動更新の両方で使う
+const SHEET_TAGLINE = 'メルマガとブログを、届いた順に1件ずつKindleへ。';
+
 // 1回の毎時実行で送る記事数の上限。初回の溜まり分や暴走フィードでの
 // 大量送信を防ぐ（残りは次の毎時実行に持ち越されるため取りこぼしはない）
 const MAX_SENDS_PER_RUN = 10;

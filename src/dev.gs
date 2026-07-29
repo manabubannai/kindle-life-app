@@ -1,11 +1,12 @@
 /**
  * Kindle Life — テンプレートシート構築（開発者用）
  *
- * 配布用テンプレートのシート構造をコードから再構築する。エンドユーザーは実行しない。
+ * 配布用テンプレートのシート構造をコードから再構築する。
  * UIは1タブのみ: 説明文＋赤枠の入力エリア3つ（説明書なしで使えることを狙う）。
- *
- * ⚠️ 実行するとタブの内容はリセットされる。配布前の開発用シートでのみ使うこと。
  * これによりシート構造もgit管理下のコードが正本になる。
+ *
+ * 入力済みの①②③は退避してから再構築後に書き戻すため、
+ * 稼働中のシートで再実行しても設定は消えない（説明文の更新などに使える）。
  */
 
 // 入力エリアの赤（ラベル文字のみ。セルの枠線・背景はコピペで消えるため使わない）
@@ -13,7 +14,23 @@ const INPUT_COLOR_ = '#cc0000';
 
 function DEV_buildTemplate() {
   const ss = ss_();
+
+  // 既存の入力（①②③）を退避
+  const saved = ['KINDLE_EMAIL', 'NEWSLETTER_LIST', 'BLOG_LIST'].map(function (name) {
+    const range = ss.getRangeByName(name);
+    return { name: name, values: range ? range.getValues() : null };
+  });
+
   buildMainSheet_(ss);
+
+  // 退避した入力を書き戻す
+  saved.forEach(function (s) {
+    if (!s.values) return;
+    const range = ss.getRangeByName(s.name);
+    if (!range) return;
+    const rows = Math.min(s.values.length, range.getNumRows());
+    range.offset(0, 0, rows, 1).setValues(s.values.slice(0, rows));
+  });
 
   // 旧構成のタブ・既定の空シートが残っていれば削除
   ['👋 使い方', '⚙️ 設定', '📧 メルマガ', '📰 ブログ', '📜 送信ログ', 'シート1', 'Sheet1'].forEach(function (name) {
@@ -42,7 +59,7 @@ function buildMainSheet_(ss) {
 
   // ── 見出しと使いかた ──
   sheet.getRange('B2').setValue('Kindle Life').setFontSize(20).setFontWeight('bold');
-  sheet.getRange('B3').setValue('メルマガとブログを、届いた順に1件ずつKindleへ。').setFontSize(11);
+  sheet.getRange('B3').setValue(SHEET_TAGLINE).setFontSize(11);
   sheet.getRange('B5')
     .setValue('使いかた: 下の赤い①〜③を埋める → 上のメニュー「Kindle Life」→「① 初期セットアップ」→ Googleの画面で「詳細」→「移動」→「許可」')
     .setFontSize(11).setFontWeight('bold');
