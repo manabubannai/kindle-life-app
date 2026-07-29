@@ -42,7 +42,7 @@ function buildMainSheet_(ss) {
 
   // ── 見出しと使いかた ──
   sheet.getRange('B2').setValue('Kindle Life').setFontSize(20).setFontWeight('bold');
-  sheet.getRange('B3').setValue('メルマガとブログを、毎朝1冊にまとめてKindleへ。').setFontSize(11);
+  sheet.getRange('B3').setValue('メルマガとブログを、届いた順に1件ずつKindleへ。').setFontSize(11);
   sheet.getRange('B5')
     .setValue('使いかた: 下の赤い①〜③を埋める → 上のメニュー「Kindle Life」→「① 初期セットアップ」→ Googleの画面で「詳細」→「移動」→「許可」')
     .setFontSize(11).setFontWeight('bold');

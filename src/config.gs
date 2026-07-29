@@ -6,10 +6,10 @@
  * 入力エリアはnamed range（KINDLE_EMAIL / NEWSLETTER_LIST / BLOG_LIST）経由で
  * 読み書きし、行の挿入や見た目の変更に耐える。
  *
- * 配信時間帯などのオプションは持たない（シンプルさ優先で固定値）。
+ * 配信タイミングなどのオプションは持たない（シンプルさ優先で固定値）。
  */
 
-const SCRIPT_VERSION = '0.1.0';
+const SCRIPT_VERSION = '0.2.0';
 
 // 新版チェック先（GitHub公開時に実URLへ差し替える）
 const UPDATE_URL = 'https://raw.githubusercontent.com/manabubannai/kindle-life-app/main/version.json';
@@ -20,8 +20,9 @@ const GUIDE_URL = 'https://github.com/manabubannai/kindle-life-app';
 // UIタブ（1枚だけ）
 const SHEET_MAIN = 'Kindle Life';
 
-// 配信時間帯（この時以降の毎時チェックで1日1回送る）。オプション化せず朝5時固定
-const DIGEST_HOUR = 5;
+// 1回の毎時実行で送る記事数の上限。初回の溜まり分や暴走フィードでの
+// 大量送信を防ぐ（残りは次の毎時実行に持ち越されるため取りこぼしはない）
+const MAX_SENDS_PER_RUN = 10;
 
 // 画像埋め込みの安全上限（Gmail添付25MBに対する予算。既存2ツールから踏襲）
 const IMAGE_LIMITS = {
@@ -34,11 +35,12 @@ const IMAGE_LIMITS = {
 // 「途中で死んでメール自体が届かない」を防いで劣化送信を優先する
 const EXECUTION_BUDGET_MS = 4.5 * 60 * 1000;
 
-// 1フィードが1日に配信できる記事数の上限（暴走フィード対策）
+// 1フィードが1回の実行で配信できる記事数の上限（暴走フィード対策）
 const MAX_POSTS_PER_FEED = 5;
 
-// 新着メールを探す最大の遡り幅（前回実行が失敗した日があっても翌日拾う）
-const MAX_WINDOW_MS = 48 * 60 * 60 * 1000;
+// 新着メールを探す最大の遡り幅。実行が数日止まっていた場合でも、
+// 再開時にここまでの新着は拾う（それ以前の分は大量送信を防ぐため見送る）
+const MAX_WINDOW_MS = 3 * 24 * 60 * 60 * 1000;
 
 function ss_() {
   return SpreadsheetApp.getActiveSpreadsheet();
@@ -132,6 +134,11 @@ function writeBlogStatus_(row, text) {
 /** 実行記録。ログタブは持たないので実行ログ（Stackdriver）のみに残す。 */
 function appendLog_(result, summary, detail) {
   console.log('[Kindle Life] ' + result + ': ' + summary + (detail ? ' — ' + String(detail).slice(0, 300) : ''));
+}
+
+/** 配信タイミングの説明文（案内・診断表示用）。 */
+function deliveryLabel_() {
+  return '新着が届き次第・1時間以内';
 }
 
 /** 「2026年7月20日（月）」形式の日付ラベル。 */

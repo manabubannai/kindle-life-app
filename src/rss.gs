@@ -9,7 +9,7 @@
 /**
  * 新着ブログ記事を収集する。 [{kind, guid, feedUrl, title, source, link, html}]
  * 初回フィードの登録（記録のみ）はここで state.feedGuids に直接行うが、
- * 新着記事のGUIDはダイジェスト送信の成功後にmain側で記録する。
+ * 新着記事のGUIDは1件ずつの送信成功後にmain側で記録する。
  * state.feedGuids のキーはユーザーが入力したURL（解決後のフィードURLではなく）。
  */
 function collectBlogPosts_(config, state, budget) {
@@ -33,7 +33,7 @@ function collectBlogPosts_(config, state, budget) {
       dropFeedCacheEntry_(blog.feed);
       console.error('フィード取得失敗: ' + feedUrl + ' — ' + e);
       writeBlogStatus_(blog.row, 'エラー: ' + String(e.message || e).slice(0, 100));
-      return; // このフィードだけスキップ（ダイジェスト全体は止めない）
+      return; // このフィードだけスキップ（実行全体は止めない）
     }
 
     // 初回登録: 既存記事のGUIDを記録するだけで配信しない
@@ -48,7 +48,7 @@ function collectBlogPosts_(config, state, budget) {
     const known = state.feedGuids[blog.feed];
     const fresh = feed.items
       .filter(function (item) { return !known[item.guid]; })
-      .slice(0, MAX_POSTS_PER_FEED); // 暴走フィード対策。残りは翌日以降に持ち越し
+      .slice(0, MAX_POSTS_PER_FEED); // 暴走フィード対策。残りは次の実行に持ち越し
 
     fresh.forEach(function (item) {
       items.push({
@@ -151,7 +151,7 @@ function absolutizeUrl_(url, baseUrl) {
 /**
  * フィードを取得する。RSS 2.0とAtomの両対応。
  * {title, items: [{title, link, guid, description}]}
- * titleはフィード自身が宣言するブログ名で、ダイジェストの出典表示に使う
+ * titleはフィード自身が宣言するブログ名で、各記事の出典表示に使う
  * （メモ列を持たないぶん、表示名はフィードから自動で得る）。
  */
 function fetchFeed_(feedUrl) {
@@ -220,7 +220,7 @@ function parseAtom_(root) {
  * 本文は<article>要素から取る。見つからないサイトはページ全体を
  * クリーンアップにかける（ナビ等のテキストが混ざるが本文は届く）。
  * 取得失敗・時間切れのときはフィードのdescription＋リンクに劣化させ、
- * ダイジェスト自体は必ず届ける。
+ * 記事自体は必ず届ける。
  */
 function fetchArticleBody_(item, budget) {
   if (Date.now() > budget.deadline) return fallbackBody_(item);

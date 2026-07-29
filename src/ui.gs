@@ -11,8 +11,8 @@ function onOpen() {
     .createMenu('Kindle Life')
     .addItem('① 初期セットアップ（最初に1回）', 'initialSetup')
     .addSeparator()
-    .addItem('✉️ 今すぐダイジェストを送信', 'runDigestNow')
-    .addItem('🧪 テスト送信（設定の確認用）', 'sendTestDigest')
+    .addItem('✉️ 今すぐ新着を確認して送信', 'runDeliveryNow')
+    .addItem('🧪 テスト送信（設定の確認用）', 'sendTestItem')
     .addItem('🩺 診断', 'runDiagnostics')
     .addSeparator()
     .addItem('⏸ このシートを停止（トリガー削除）', 'stopAll')
@@ -59,7 +59,7 @@ function initialSetup() {
   appendLog_('セットアップ', 'メルマガ' + config.newsletters.length + '件・ブログ' + config.blogs.length + '件で開始', '');
 
   let message =
-    'これで完了です。明日から毎朝' + DIGEST_HOUR + '時台に、新着をまとめた1冊が届きます（新着がない日はお休みです）。\n\n' +
+    'これで完了です。ここからは登録したメルマガ・ブログの新着が、' + deliveryLabel_() + 'に1件ずつKindleへ届きます。\n\n' +
     '仕上げに2つだけ:\n' +
     '1. Amazonの「コンテンツと端末の管理」→「設定」→「承認済みEメールアドレス」に、' +
     'あなたのGmailアドレスを追加してください（未登録だとKindleに届きません）\n' +
@@ -71,10 +71,10 @@ function initialSetup() {
 }
 
 /**
- * テスト送信: 固定のサンプル2記事を合本してKindleへ送る。
+ * テスト送信: 固定のサンプル記事1件をKindleへ送る。
  * Kindleアドレスの正しさとAmazonの承認済みリスト設定を確認するためのもの。
  */
-function sendTestDigest() {
+function sendTestItem() {
   const ui = SpreadsheetApp.getUi();
   const kindleEmail = String(namedValue_('KINDLE_EMAIL') || '').trim();
   if (!/@kindle\.com$/i.test(kindleEmail)) {
@@ -86,37 +86,25 @@ function sendTestDigest() {
     return;
   }
 
-  const dateLabel = formatDateLabel_(new Date());
-  const sample = [
-    {
-      kind: 'newsletter',
-      title: 'テスト記事①: Kindle Lifeへようこそ',
-      source: 'Kindle Life',
-      dateStr: '',
-      html:
-        '<p>これはテスト送信です。この記事がKindleで読めていれば、設定はすべて正しく完了しています。</p>' +
-        '<p>明日からは、登録したメルマガとブログの新着が毎朝この形で1冊にまとまって届きます。</p>',
-    },
-    {
-      kind: 'blog',
-      title: 'テスト記事②: 目次リンクの確認',
-      source: 'Kindle Life',
-      dateStr: '',
-      html:
-        '<p>冒頭の目次から、この記事にジャンプできましたか？</p>' +
-        '<ul><li>目次リンクが動く</li><li>記事の区切りでページが変わる</li></ul>' +
-        '<p>この2つが確認できれば完璧です。</p>',
-    },
-  ];
+  const sample = {
+    kind: 'newsletter',
+    title: 'テスト送信: Kindle Lifeへようこそ（' + formatDateLabel_(new Date()) + '）',
+    source: 'Kindle Life',
+    dateStr: '',
+    html:
+      '<p>これはテスト送信です。この記事がKindleで読めていれば、設定はすべて正しく完了しています。</p>' +
+      '<p>これからは、登録したメルマガとブログの新着が、' + deliveryLabel_() + 'にこの形で1件ずつ届きます。</p>' +
+      '<p>Kindleライブラリでの書名は、メルマガの件名・記事のタイトルがそのまま使われます。</p>',
+  };
   const budget = { count: 0, bytes: 0, deadline: Date.now() + EXECUTION_BUDGET_MS };
 
   try {
-    const html = buildDigestHtml_([sample[0]], [sample[1]], dateLabel + '（テスト）', budget, '');
-    sendDigestMail_(kindleEmail, html, dateLabel + ' テスト');
+    const html = buildItemHtml_(sample, budget);
+    sendItemMail_(kindleEmail, sample, html);
     appendLog_('テスト送信', kindleEmail + ' へサンプルを送信', '');
     ui.alert(
       'テストを送信しました',
-      '数分〜十数分でKindleのライブラリに「Kindle Life」が届きます。\n\n' +
+      '数分〜十数分でKindleのライブラリに「テスト送信: Kindle Lifeへようこそ」が届きます。\n\n' +
         '届かない場合は、Amazonの「コンテンツと端末の管理」→「設定」→「承認済みEメールアドレス」に ' +
         Session.getEffectiveUser().getEmail() + ' が登録されているか確認してください。',
       ui.ButtonSet.OK
@@ -139,13 +127,13 @@ function runDiagnostics() {
     lines.push('■ 設定: ⚠️ 不備があります');
     config.issues.forEach(function (issue) { lines.push('  ・' + issue); });
   } else {
-    lines.push('■ 設定: OK（送信先 ' + config.kindleEmail + ' / 毎朝' + DIGEST_HOUR + '時台）');
+    lines.push('■ 設定: OK（送信先 ' + config.kindleEmail + ' / ' + deliveryLabel_() + '）');
   }
 
   lines.push('■ 自動実行トリガー: ' + (hasHourlyTrigger_() ? 'OK（設定済み）' : '⚠️ 未設定 →「① 初期セットアップ」を実行してください'));
 
-  const lastRun = getStateValue_('lastRunDate');
-  lines.push('■ 最終処理日: ' + (lastRun || 'まだ実行されていません'));
+  const lastSuccessTs = loadState_().lastSuccessTs;
+  lines.push('■ 最終確認: ' + (lastSuccessTs ? Utilities.formatDate(new Date(lastSuccessTs), timeZone_(), 'M/d HH:mm') : 'まだ実行されていません'));
 
   // Gmail検索の疎通（直近2日でのヒット数）
   if (config.newsletters.length > 0) {
@@ -179,7 +167,7 @@ function stopAll() {
   const ui = SpreadsheetApp.getUi();
   const answer = ui.alert(
     'このシートを停止しますか？',
-    '自動実行トリガーを削除します。以後このシートからダイジェストは届きません。\n（再開したいときは「① 初期セットアップ」を実行すれば元に戻ります）',
+    '自動実行トリガーを削除します。以後このシートからKindleへの送信は止まります。\n（再開したいときは「① 初期セットアップ」を実行すれば元に戻ります）',
     ui.ButtonSet.OK_CANCEL
   );
   if (answer !== ui.Button.OK) return;

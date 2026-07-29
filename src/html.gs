@@ -136,7 +136,7 @@ function fetchImageAsDataUri_(url) {
 /**
  * HTML内のリモート画像をダウンロードしてbase64データURIで埋め込む。
  * Amazonの変換エンジンはリモート画像を取得しないため必須の処理。
- * budget（枚数・バイト数・締切）は合本全体で共有し、超過後の画像と
+ * budget（枚数・バイト数・締切）は1冊（記事1件）の中で共有し、超過後の画像と
  * 取得できない画像はタグごと取り除く（リンク切れアイコン化を防ぐ）。
  */
 function embedImages_(html, budget) {

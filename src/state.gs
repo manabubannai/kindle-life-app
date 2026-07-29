@@ -8,7 +8,7 @@
  * - feedGuids: フィード別の送信済み記事GUID {feedUrl: {guid: 時刻ms}}
  *   フィード単位で管理することで「後からフィードを追加したら、そのフィードだけ
  *   初回は記録のみ」が実現し、追加時の過去記事一斉配信を防ぐ
- * - lastSuccessTs: 最後にダイジェスト処理が成功した時刻（Gmail検索窓の起点）
+ * - lastSuccessTs: 最後に新着を全件処理しきった時刻（Gmail検索窓の起点）
  */
 
 const PROCESSED_RETENTION_MS = 7 * 24 * 60 * 60 * 1000;
@@ -57,7 +57,7 @@ function saveState_(state) {
   p.setProperty('lastSuccessTs', String(state.lastSuccessTs));
 }
 
-/** 単純な文字列状態（lastRunDate / lastErrorMailDate / lastNotifiedVersion）。 */
+/** 単純な文字列状態（lastErrorMailDate / lastUpdateCheckDate / lastNotifiedVersion）。 */
 function getStateValue_(key) {
   return PropertiesService.getScriptProperties().getProperty(key);
 }

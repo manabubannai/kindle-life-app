@@ -1,25 +1,27 @@
 /**
  * Kindle Life — メルマガ収集（Gmail）
  *
- * 登録差出人のメールを1クエリで検索し、前回成功実行以降（最大48h）の
+ * 登録差出人のメールを1クエリで検索し、前回成功実行以降（最大 MAX_WINDOW_MS）の
  * 未処理メールをクリーンアップ済みHTMLとして収集する。
  * 読み取りのみ（送信はMailApp経由。gmail.readonlyスコープで動かす）。
  */
 
 /**
  * 新着メルマガを収集する。 [{kind, id, title, source, dateMs, dateStr, html}]
- * ここでは処理済みに「しない」。ダイジェスト送信の成功後にmain側で記録する
- * （失敗した日の分は翌日のダイジェストで自然に拾われる）。
+ * ここでは処理済みに「しない」。1件ずつの送信成功後にmain側で記録する
+ * （失敗した分は次の毎時実行で自然に拾われる）。
  */
 function collectNewsletters_(config, state, budget) {
   const senders = config.newsletters;
   if (senders.length === 0) return [];
 
   const windowStart = Math.max(
-    state.lastSuccessTs || Date.now() - 24 * 60 * 60 * 1000,
+    state.lastSuccessTs || Date.now() - MAX_WINDOW_MS,
     Date.now() - MAX_WINDOW_MS
   );
-  const days = Math.min(4, Math.max(2, Math.ceil((Date.now() - windowStart) / (24 * 60 * 60 * 1000)) + 1));
+  // Gmailの newer_than は日単位。窓の上限（MAX_WINDOW_MS）＋1日までしか遡らない
+  const maxDays = Math.ceil(MAX_WINDOW_MS / (24 * 60 * 60 * 1000)) + 1;
+  const days = Math.min(maxDays, Math.max(2, Math.ceil((Date.now() - windowStart) / (24 * 60 * 60 * 1000)) + 1));
 
   const query = buildSearchQuery_(senders, days);
   const threads = GmailApp.search(query, 0, 100);
