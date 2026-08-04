@@ -16,6 +16,8 @@ Gmailに届くメルマガと、お気に入りブログの新着記事を、届
 
 以後は新着が届くたびに（最長1時間ほどで）、1件ずつKindleに届きます。
 
+毎日届くメルマガなど、1通ずつだと多すぎる場合は、差出人アドレスの右のセルに好きなタイトル（例:「◯◯メルマガ」）を書くと、その差出人だけ**毎週月曜の朝に1冊にまとめて**届きます（書名は「◯◯メルマガ 7/27〜8/2」のようになります）。
+
 仕上げに、Amazonの「[コンテンツと端末の管理](https://www.amazon.co.jp/hz/mycd/myx)」→「設定」→「承認済みEメールアドレス」に自分のGmailアドレスを追加し、「🧪 テスト送信」で確認してください。
 
 詳しくは [セットアップガイド](docs/setup-guide-ja.md) を参照。
@@ -49,7 +51,7 @@ src/            # GAS本体（claspでpush）
 ├── gmail.gs    # メルマガ収集（gmail.readonly）
 ├── rss.gs      # RSS 2.0 + Atom巡回・全文取得
 ├── html.gs     # 白リストクリーナー・画像埋め込み（共通エンジン）
-├── digest.gs   # 1記事＝1冊のHTML組立
+├── digest.gs   # 1冊ぶんのHTML組立（個別＋週1まとめ）
 ├── mail.gs     # Kindle宛送信・エラー通知
 ├── state.gs    # 処理済みID/GUID（ScriptProperties）
 ├── triggers.gs # トリガー管理

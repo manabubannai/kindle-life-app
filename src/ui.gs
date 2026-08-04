@@ -149,8 +149,19 @@ function runDiagnostics() {
 
   lines.push('■ 自動実行トリガー: ' + (hasHourlyTrigger_() ? 'OK（設定済み）' : '⚠️ 未設定 →「① 初期セットアップ」を実行してください'));
 
-  const lastSuccessTs = loadState_().lastSuccessTs;
-  lines.push('■ 最終確認: ' + (lastSuccessTs ? Utilities.formatDate(new Date(lastSuccessTs), timeZone_(), 'M/d HH:mm') : 'まだ実行されていません'));
+  const state = loadState_();
+  lines.push('■ 最終確認: ' + (state.lastSuccessTs ? Utilities.formatDate(new Date(state.lastSuccessTs), timeZone_(), 'M/d HH:mm') : 'まだ実行されていません'));
+
+  // 週1まとめの状態（設定中のタイトル＋貯まっている記事数）
+  const digestTitleSet = {};
+  config.newsletters.forEach(function (n) { if (n.digestTitle) digestTitleSet[n.digestTitle] = true; });
+  Object.keys(state.weeklyPending || {}).forEach(function (t) {
+    if (state.weeklyPending[t].length > 0) digestTitleSet[t] = true;
+  });
+  Object.keys(digestTitleSet).forEach(function (title) {
+    const count = (state.weeklyPending[title] || []).length;
+    lines.push('■ 週1まとめ「' + title + '」: 貯まっている記事 ' + count + '本（毎週月曜の朝にまとめて1冊で届きます）');
+  });
 
   // Gmail検索の疎通（直近2日でのヒット数）
   if (config.newsletters.length > 0) {

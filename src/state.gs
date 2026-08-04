@@ -8,21 +8,27 @@
  * - feedGuids: フィード別の送信済み記事GUID {feedUrl: {guid: 時刻ms}}
  *   フィード単位で管理することで「後からフィードを追加したら、そのフィードだけ
  *   初回は記録のみ」が実現し、追加時の過去記事一斉配信を防ぐ
+ * - weeklyPending: 週1まとめ待ちのメールID {まとめタイトル: [{id, dateMs}]}
+ *   本文は貯めない（ScriptPropertiesの容量制約）。送信時にIDからメールを引き直す
  * - lastSuccessTs: 最後に新着を全件処理しきった時刻（Gmail検索窓の起点）
  */
 
 const PROCESSED_RETENTION_MS = 7 * 24 * 60 * 60 * 1000;
 const GUIDS_PER_FEED = 300;
+const PENDING_PER_DIGEST = 100;
 
 function loadState_() {
   const p = PropertiesService.getScriptProperties();
   let processedIds = {};
   let feedGuids = {};
+  let weeklyPending = {};
   try { processedIds = JSON.parse(p.getProperty('processedIds') || '{}'); } catch (e) {}
   try { feedGuids = JSON.parse(p.getProperty('feedGuids') || '{}'); } catch (e) {}
+  try { weeklyPending = JSON.parse(p.getProperty('weeklyPending') || '{}'); } catch (e) {}
   return {
     processedIds: processedIds,
     feedGuids: feedGuids,
+    weeklyPending: weeklyPending,
     lastSuccessTs: Number(p.getProperty('lastSuccessTs')) || 0,
   };
 }
@@ -52,8 +58,20 @@ function saveState_(state) {
     }
   });
 
+  // 週1まとめ待ちは各タイトル新しい順にPENDING_PER_DIGEST件だけ保持（暴走差出人対策）
+  const prunedPending = {};
+  Object.keys(state.weeklyPending || {}).forEach(function (title) {
+    const entries = state.weeklyPending[title];
+    if (!entries || entries.length === 0) return;
+    prunedPending[title] = entries
+      .slice()
+      .sort(function (a, b) { return b.dateMs - a.dateMs; })
+      .slice(0, PENDING_PER_DIGEST);
+  });
+
   p.setProperty('processedIds', JSON.stringify(prunedIds));
   p.setProperty('feedGuids', JSON.stringify(prunedGuids));
+  p.setProperty('weeklyPending', JSON.stringify(prunedPending));
   p.setProperty('lastSuccessTs', String(state.lastSuccessTs));
 }
 

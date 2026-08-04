@@ -9,7 +9,7 @@
  * 配信タイミングなどのオプションは持たない（シンプルさ優先で固定値）。
  */
 
-const SCRIPT_VERSION = '0.2.0';
+const SCRIPT_VERSION = '0.3.0';
 
 // 新版チェック先（GitHub公開時に実URLへ差し替える）
 const UPDATE_URL = 'https://raw.githubusercontent.com/manabubannai/kindle-life-app/main/version.json';
@@ -40,6 +40,15 @@ const EXECUTION_BUDGET_MS = 4.5 * 60 * 1000;
 
 // 1フィードが1回の実行で配信できる記事数の上限（暴走フィード対策）
 const MAX_POSTS_PER_FEED = 5;
+
+// 週1まとめ配信: シートでまとめタイトルを指定した差出人は、
+// 毎週この曜日（ISO: 1=月）のこの時刻以降の最初の実行で、1冊にまとめて届く
+const DIGEST_WEEKDAY = 1;
+const DIGEST_HOUR = 6;
+
+// 救済: 実行停止などで月曜に送れなかった場合、最古の未送信記事が
+// この日数を超えたら曜日を待たずにまとめて送る（貯めっぱなし防止）
+const DIGEST_OVERDUE_MS = 9 * 24 * 60 * 60 * 1000;
 
 // 新着メールを探す最大の遡り幅。実行が数日止まっていた場合でも、
 // 再開時にここまでの新着は拾う（それ以前の分は大量送信を防ぐため見送る）
@@ -84,14 +93,23 @@ function readConfig_() {
   };
 }
 
-/** メルマガ入力エリア（NEWSLETTER_LIST）を読む。書いてある行が有効。 [{email}] */
+/**
+ * メルマガ入力エリア（NEWSLETTER_LIST）を読む。書いてある行が有効。 [{email, digestTitle}]
+ * 右隣の列（NEWSLETTER_DIGEST_TITLES）にタイトルが書いてある差出人は
+ * 週1まとめ配信（digestTitleがそのまま1冊の書名の元になる）。空欄なら届き次第個別。
+ */
 function readNewsletters_(issues) {
   const range = ss_().getRangeByName('NEWSLETTER_LIST');
   if (!range) return [];
+  const titleRange = ss_().getRangeByName('NEWSLETTER_DIGEST_TITLES');
+  const titleValues = titleRange ? titleRange.getValues() : [];
   return range
     .getValues()
-    .map(function (r) {
-      return { email: String(r[0] || '').trim() };
+    .map(function (r, i) {
+      return {
+        email: String(r[0] || '').trim(),
+        digestTitle: String((titleValues[i] && titleValues[i][0]) || '').trim(),
+      };
     })
     .filter(function (x) {
       if (x.email === '') return false;

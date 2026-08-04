@@ -24,12 +24,21 @@ function runDeliveryNow() {
   const ui = SpreadsheetApp.getUi();
   try {
     const result = runDelivery_();
-    if (result.sent > 0) {
+    if (result.sent > 0 || result.digestBooks > 0) {
+      const parts = [];
+      if (result.sent > 0) parts.push('メルマガ' + result.newsletters + '通・ブログ記事' + result.posts + '本を1件ずつ');
+      if (result.digestBooks > 0) parts.push('週1まとめ' + result.digestBooks + '冊を');
       ui.alert(
         '送信しました',
-        'メルマガ' + result.newsletters + '通・ブログ記事' + result.posts + '本を、1件ずつKindleへ送りました。\n' +
-          '数分〜十数分でKindleのライブラリに届きます。' +
+        parts.join('、') + 'Kindleへ送りました。\n数分〜十数分でKindleのライブラリに届きます。' +
+          (result.pooled > 0 ? '\n（ほかに' + result.pooled + '通を週1まとめ用に受け取りました）' : '') +
           (result.remaining > 0 ? '\n（残り' + result.remaining + '件は次の自動実行で順に届きます）' : ''),
+        ui.ButtonSet.OK
+      );
+    } else if (result.pooled > 0) {
+      ui.alert(
+        '週1まとめ用に受け取りました',
+        '新着' + result.pooled + '通を受け取りました。週1まとめの指定があるため、今は送らず毎週月曜の朝にまとめて1冊で届きます。',
         ui.ButtonSet.OK
       );
     } else {
@@ -63,14 +72,22 @@ function runDelivery_() {
 
   const newsletters = collectNewsletters_(config, state, budget);
   const posts = collectBlogPosts_(config, state, budget);
-  const items = newsletters.concat(posts);
 
-  if (items.length === 0) {
-    // 新着なし: フィード初回登録の記録だけ保存して静かに抜ける
-    state.lastSuccessTs = now.getTime();
-    saveState_(state);
-    return { sent: 0, newsletters: 0, posts: 0, remaining: 0 };
-  }
+  // 週1まとめ指定の差出人分は今は送らず、メールIDだけ貯めて受け取りを記録する
+  // （本文は貯めない。まとめ送信時にIDからメールを引き直す）
+  let pooled = 0;
+  const immediate = [];
+  newsletters.forEach(function (item) {
+    if (item.digestTitle) {
+      if (!state.weeklyPending[item.digestTitle]) state.weeklyPending[item.digestTitle] = [];
+      state.weeklyPending[item.digestTitle].push({ id: item.id, dateMs: item.dateMs });
+      state.processedIds[item.id] = Date.now();
+      pooled++;
+    } else {
+      immediate.push(item);
+    }
+  });
+  const items = immediate.concat(posts);
 
   // 1回の実行で送る上限（初回の溜まり分などでの大量送信を防ぐ。残りは次の毎時実行へ）
   const toSend = items.slice(0, MAX_SENDS_PER_RUN);
@@ -104,17 +121,40 @@ function runDelivery_() {
   if (!sendError && items.length === toSend.length) {
     state.lastSuccessTs = now.getTime();
   }
+
+  // 週1まとめの送信判定（月曜朝、または滞留の救済）。
+  // 個別送信が失敗した実行では試みない（同じ原因で二重に失敗させない）
+  let digestBooks = 0;
+  let digestError = null;
+  if (!sendError) {
+    try {
+      digestBooks = sendDueDigests_(config.kindleEmail, state, budget, now);
+    } catch (e) {
+      digestError = e; // 送信済みのまとめ分のpending削除は state に反映済み。未送信分は残り再試行される
+    }
+  }
+
   saveState_(state);
 
   const remaining = items.length - (sentNewsletters + sentPosts);
-  if (sentNewsletters + sentPosts > 0) {
+  if (sentNewsletters + sentPosts + pooled + digestBooks > 0) {
     appendLog_(
       '送信',
-      'メルマガ' + sentNewsletters + '通＋ブログ記事' + sentPosts + '本を個別に送信',
+      'メルマガ' + sentNewsletters + '通＋ブログ記事' + sentPosts + '本を個別に送信' +
+        (pooled > 0 ? '、週1まとめ用に' + pooled + '通を貯留' : '') +
+        (digestBooks > 0 ? '、週1まとめ' + digestBooks + '冊を送信' : ''),
       remaining > 0 ? '残り' + remaining + '件は次の実行で送信' : ''
     );
   }
   if (sendError) throw sendError;
+  if (digestError) throw digestError;
 
-  return { sent: sentNewsletters + sentPosts, newsletters: sentNewsletters, posts: sentPosts, remaining: remaining };
+  return {
+    sent: sentNewsletters + sentPosts,
+    newsletters: sentNewsletters,
+    posts: sentPosts,
+    remaining: remaining,
+    pooled: pooled,
+    digestBooks: digestBooks,
+  };
 }

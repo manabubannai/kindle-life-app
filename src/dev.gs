@@ -16,7 +16,7 @@ function DEV_buildTemplate() {
   const ss = ss_();
 
   // 既存の入力（①②③）を退避
-  const saved = ['KINDLE_EMAIL', 'NEWSLETTER_LIST', 'BLOG_LIST'].map(function (name) {
+  const saved = ['KINDLE_EMAIL', 'NEWSLETTER_LIST', 'NEWSLETTER_DIGEST_TITLES', 'BLOG_LIST'].map(function (name) {
     const range = ss.getRangeByName(name);
     return { name: name, values: range ? range.getValues() : null };
   });
@@ -52,10 +52,11 @@ function buildMainSheet_(ss) {
   sheet.setHiddenGridlines(true);
 
   sheet.setColumnWidth(1, 24);   // A: 余白
-  sheet.setColumnWidth(2, 360);  // B: メルマガ入力 / 見出し
-  sheet.setColumnWidth(3, 24);   // C: 余白
-  sheet.setColumnWidth(4, 360);  // D: ブログ入力
-  sheet.setColumnWidth(5, 320);  // E: ブログ状態（自動）
+  sheet.setColumnWidth(2, 330);  // B: メルマガ入力 / 見出し
+  sheet.setColumnWidth(3, 180);  // C: 週1まとめタイトル（任意）
+  sheet.setColumnWidth(4, 24);   // D: 余白
+  sheet.setColumnWidth(5, 360);  // E: ブログ入力
+  sheet.setColumnWidth(6, 320);  // F: ブログ状態（自動）
 
   // ── 見出しと使いかた ──
   sheet.getRange('B2').setValue('Kindle Life').setFontSize(20).setFontWeight('bold');
@@ -86,7 +87,7 @@ function buildMainSheet_(ss) {
     .setValue('（Amazonの「コンテンツと端末の管理」→「設定」で確認できます）')
     .setFontSize(9).setFontColor('#999999');
 
-  // ── ② メルマガ（B列） / ③ ブログ（D列） ──
+  // ── ② メルマガ（B列＋C列の週1まとめ） / ③ ブログ（E列） ──
   const LIST_TOP = 13;
   const LIST_ROWS = 30;
 
@@ -108,28 +109,40 @@ function buildMainSheet_(ss) {
     'やめたいときはセルを空にするだけです。'
   );
 
-  sheet.getRange('D12')
+  sheet.getRange('C12')
+    .setValue('週1まとめのタイトル（任意）')
+    .setFontWeight('bold').setFontColor('#666666');
+  const digestTitles = sheet.getRange(LIST_TOP, 3, LIST_ROWS, 1);
+  ss.setNamedRange('NEWSLETTER_DIGEST_TITLES', digestTitles);
+  digestTitles.setFontSize(10);
+  sheet.getRange('C12').setNote(
+    'ここにタイトルを書くと、その差出人のメルマガは1通ずつではなく、毎週月曜の朝にまとめて1冊で届きます。\n' +
+    'タイトルはそのままKindleでの書名になります（例:「◯◯メルマガ」→「◯◯メルマガ 7/27〜8/2」）。\n' +
+    '空欄なら従来どおり届き次第1件ずつです。'
+  );
+
+  sheet.getRange('E12')
     .setValue('③ 読みたいブログのURL（1行に1つ）')
     .setFontWeight('bold').setFontColor(INPUT_COLOR_);
-  const blogList = sheet.getRange(LIST_TOP, 4, LIST_ROWS, 1);
+  const blogList = sheet.getRange(LIST_TOP, 5, LIST_ROWS, 1);
   ss.setNamedRange('BLOG_LIST', blogList);
   blogList
     .setDataValidation(
       SpreadsheetApp.newDataValidation()
-        .requireFormulaSatisfied('=OR(ISBLANK(D13),REGEXMATCH(TO_TEXT(D13),"^https?://"))')
+        .requireFormulaSatisfied('=OR(ISBLANK(E13),REGEXMATCH(TO_TEXT(E13),"^https?://"))')
         .setAllowInvalid(true)
         .setHelpText('https:// で始まるブログのURLを入力してください')
         .build()
     );
-  sheet.getRange('D12').setNote(
+  sheet.getRange('E12').setNote(
     'ブログのトップページのURLでOK（フィードの場所は自動で見つけ、ブログ名が右に表示されます）。\n' +
     'やめたいときはセルを空にするだけです。'
   );
 
   // ブログ状態（スクリプトが書く表示専用。説明書きは置かない — 自動で表示されれば分かる）
-  sheet.getRange(LIST_TOP, 5, LIST_ROWS, 1).setFontSize(9).setFontColor('#666666');
+  sheet.getRange(LIST_TOP, 6, LIST_ROWS, 1).setFontSize(9).setFontColor('#666666');
 
   // ── 保護: 入力エリア以外は警告付き保護 ──
   const protection = sheet.protect().setWarningOnly(true);
-  protection.setUnprotectedRanges([emailCell, newsletterList, blogList]);
+  protection.setUnprotectedRanges([emailCell, newsletterList, digestTitles, blogList]);
 }

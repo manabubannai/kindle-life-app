@@ -32,15 +32,9 @@ function collectNewsletters_(config, state, budget) {
       const id = message.getId();
       if (state.processedIds[id]) return; // 送信済み
       if (message.getDate().getTime() < windowStart) return; // 窓の外
-      if (!isTargetSender_(message.getFrom(), senders)) return; // スレッド内の無関係なメールを除外
+      const sender = findSender_(message.getFrom(), senders); // スレッド内の無関係なメールを除外
+      if (!sender) return;
       if (Date.now() > budget.deadline) return; // 時間切れ: 今回は見送り（翌回で拾われる）
-
-      let body = message.getBody();
-      if (!body || !looksLikeHtml_(body)) {
-        body = plainTextToHtml_(message.getPlainBody() || '');
-      } else {
-        body = cleanEmailHtml_(body);
-      }
 
       items.push({
         kind: 'newsletter',
@@ -49,7 +43,8 @@ function collectNewsletters_(config, state, budget) {
         source: senderDisplayName_(message.getFrom()),
         dateMs: message.getDate().getTime(),
         dateStr: Utilities.formatDate(message.getDate(), timeZone_(), 'M/d HH:mm'),
-        html: body,
+        html: newsletterBodyHtml_(message),
+        digestTitle: sender.digestTitle || '',
       });
     });
   });
@@ -67,12 +62,22 @@ function buildSearchQuery_(senders, days) {
   return 'from:(' + fromClause + ') newer_than:' + days + 'd';
 }
 
-/** Fromヘッダー（例: "Foo News <news@example.com>"）が差出人リストに合致するか。 */
-function isTargetSender_(fromHeader, senders) {
-  const lower = fromHeader.toLowerCase();
-  return senders.some(function (s) {
-    return lower.indexOf(s.email.toLowerCase()) !== -1;
-  });
+/** Fromヘッダー（例: "Foo News <news@example.com>"）に合致する差出人設定を返す。なければnull。 */
+function findSender_(fromHeader, senders) {
+  const lower = String(fromHeader).toLowerCase();
+  for (let i = 0; i < senders.length; i++) {
+    if (lower.indexOf(senders[i].email.toLowerCase()) !== -1) return senders[i];
+  }
+  return null;
+}
+
+/** メール1通をクリーンアップ済み本文HTMLにする（個別配信・週1まとめ共通）。 */
+function newsletterBodyHtml_(message) {
+  const body = message.getBody();
+  if (!body || !looksLikeHtml_(body)) {
+    return plainTextToHtml_(message.getPlainBody() || '');
+  }
+  return cleanEmailHtml_(body);
 }
 
 /** Fromヘッダーから表示名（なければアドレス）を取り出す。 */
