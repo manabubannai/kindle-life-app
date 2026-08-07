@@ -41,17 +41,16 @@ GAS版Kindle Life（配信エンジン）の上に載せる、AI連携を前提�
 - ユーザーの導入手順: ①従来通りシートをコピーしてGAS配信をセットアップ → ②GASメニュー「Macアプリ連携」でWebアプリURL＋トークンを表示 → ③Macアプリにそれを貼る → ④AIのAPIキーを貼る。以上。
 - 運営サーバー・アカウント審査・OAuth同意画面はゼロのまま。
 
-## 2. 機能1・2: ブログ/メルマガ購読（GASブリッジ経由）
+## 2. 機能1・2: ブログ/メルマガ購読（シート連携チャネル経由）
 
-### GAS側追加: `bridge.gs`
-- `doPost(e)`: JSON `{token, action, payload}`。トークンはScriptPropertiesに保存したランダム値と照合（不一致は即404風の空応答）
-- actions:
-  - `getConfig` — 購読リスト（named range読み出し）とKindleアドレス設定有無
-  - `setConfig` — 購読リストの書き込み（named range経由。検証はシートのルールを再利用）
-  - `getStatus` — 最終実行時刻・直近の送信履歴（state.gsのScriptPropertiesから）・エラー有無
-  - `runNow` — `runDeliveryNow()` を起動
-- デプロイ: 「ウェブアプリ / 自分として実行 / 全員」。URLとトークンはGASカスタムメニューに「📱 Macアプリ連携」を追加してダイアログ表示（コピペ用）
-- トークンがURLに載らないようPOST bodyのみで受ける。GAS Webアプリは元々HTTPS固定
+### 設計変更（2026-08-07・実装済み）: Webアプリ → **Googleフォーム・チャネル**
+当初設計のWebアプリ(doPost)は、**API/claspで作ったWebアプリデプロイが404になるGoogle側の制限**（エディタでの手動デプロイ操作が必須）に当たり、非エンジニアに「Apps Scriptエディタを開かせる」ことになるため廃止。代わりに:
+
+- GASの「📱 Macアプリ連携」メニューが**連携用Googleフォームを自動作成**し、`onFormSubmit`トリガーを張る（`ensureBridgeForm_`）
+- **フォームへのPOST（formResponse）はOAuth不要**でMacアプリから直接投げられ、送信と同時にトリガーが即時発火する（ポーリング不要）
+- メニューは**連携コード** `KL1.<base64{u:POST先URL, e:entryフィールドID, t:トークン}>` をダイアログ表示 → ユーザーはそれをアプリの配信タブに貼るだけ。**Apps Scriptエディタは一切開かない**
+- actions: `sendUrl`（記事URL→取得→クリーンHTML→Kindleへ送信。既存エンジンを再利用）。片方向チャネルのため実行結果は返さない（失敗は既存のエラーメール通知）
+- 完全無料・運営サーバーなし・各ユーザーのGmail送信枠のまま（シートコピー方式の思想を維持）
 
 ### Macアプリ側
 - 「配信」タブ: 購読メルマガ差出人・ブログURLの一覧編集（保存で `setConfig`）、最終配信・エラーの表示、「今すぐ送信」ボタン
