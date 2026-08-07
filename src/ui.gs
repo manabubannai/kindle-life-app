@@ -32,6 +32,8 @@ function onOpen() {
     .addItem('🧪 テスト送信（設定の確認用）', 'sendTestItem')
     .addItem('🩺 診断', 'runDiagnostics')
     .addSeparator()
+    .addItem('📱 Macアプリ連携', 'showBridgeInfo')
+    .addSeparator()
     .addItem('⏸ このシートを停止（トリガー削除）', 'stopAll')
     .addItem('❓ ヘルプ', 'showHelp')
     .addToUi();
