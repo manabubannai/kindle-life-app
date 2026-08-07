@@ -1,53 +1,99 @@
 /**
- * Kindle Life — Macアプリ連携ブリッジ（Webアプリ）
+ * Kindle Life — Macアプリ連携ブリッジ（Googleフォーム・チャネル）
  *
- * Macアプリからの要求を受けて、任意の記事URLをKindleへ送る。
- * - デプロイ: 「ウェブアプリ / 自分として実行 / 全員」。URLは推測不能なIDを含む
- * - 認証: 初回に Macアプリが生成したトークンを init で登録（TOFU）。以後は毎回照合
- * - トークンはURLに載せず、常にPOST bodyで受ける（GAS WebアプリはHTTPS固定）
- * - Google OAuthをアプリ側に一切持たせないための設計（DESIGN §mac-app 参照）
+ * MacアプリからGASへ指示を渡すのに「連携用Googleフォーム」を使う。
+ * - フォームへのPOST（formResponse）はOAuth不要でどのアプリからでも投げられる
+ * - 送信と同時に onFormSubmit トリガーが即時発火する（ポーリング不要）
+ * - WebアプリのデプロイはGoogleがエディタでの手動操作を要求するため不採用
+ *   （API/claspで作ったWebアプリデプロイは404になる制限を2026-08-07に実測確認）
+ *
+ * 初期セットアップがフォームを自動作成し、「連携コード」（POST先URL・フィールドID・
+ * トークンをまとめたもの）をダイアログ表示 → ユーザーはそれをMacアプリに1回貼るだけ。
  */
 
-function doPost(e) {
-  var out;
-  try {
-    var body = JSON.parse((e && e.postData && e.postData.contents) || '{}');
-    out = bridgeHandle_(body);
-  } catch (err) {
-    out = { ok: false, error: String((err && err.message) || err) };
+/** 連携フォームを用意し（無ければ作成）、onFormSubmitトリガーを張り直す。 */
+function ensureBridgeForm_() {
+  var props = PropertiesService.getScriptProperties();
+  var token = props.getProperty('BRIDGE_TOKEN');
+  if (!token) {
+    token = Utilities.getUuid().replace(/-/g, '') + Utilities.getUuid().replace(/-/g, '');
+    props.setProperty('BRIDGE_TOKEN', token);
   }
-  return ContentService.createTextOutput(JSON.stringify(out)).setMimeType(
-    ContentService.MimeType.JSON
-  );
+
+  var form = null;
+  var formId = props.getProperty('BRIDGE_FORM_ID');
+  if (formId) {
+    try {
+      form = FormApp.openById(formId);
+    } catch (e) {
+      form = null; // 削除されていたら作り直す
+    }
+  }
+  if (!form) {
+    form = FormApp.create('Kindle Life 連携（削除しないでください）');
+    form.setDescription(
+      'Kindle LifeのMacアプリからの指示（記事をKindleへ送る等）を受け取るための内部フォームです。' +
+      '削除するとMacアプリ連携が動かなくなります。'
+    );
+    form.addTextItem().setTitle('payload');
+    props.setProperty('BRIDGE_FORM_ID', form.getId());
+  }
+
+  ScriptApp.getProjectTriggers().forEach(function (t) {
+    if (t.getHandlerFunction() === 'onBridgeSubmit') ScriptApp.deleteTrigger(t);
+  });
+  ScriptApp.newTrigger('onBridgeSubmit').forForm(form).onFormSubmit().create();
+  return form;
 }
 
-function bridgeHandle_(body) {
+/** Macアプリに貼る連携コード。POST先URL・フィールドID・トークンをbase64でまとめる。 */
+function bridgeCode_() {
   var props = PropertiesService.getScriptProperties();
-  var stored = props.getProperty('BRIDGE_TOKEN');
-  var token = String(body.token || '');
+  var formId = props.getProperty('BRIDGE_FORM_ID');
+  var token = props.getProperty('BRIDGE_TOKEN');
+  if (!formId || !token) return null;
+  var form;
+  try {
+    form = FormApp.openById(formId);
+  } catch (e) {
+    return null;
+  }
+  var item = form.getItems()[0].asTextItem();
+  // prefill URLから formResponse の正確なフィールド名（entry.xxxx）を取り出す
+  var prefill = form
+    .createResponse()
+    .withItemResponse(item.createResponse('x'))
+    .toPrefilledUrl();
+  var m = prefill.match(/[?&]entry\.(\d+)=/);
+  if (!m) return null;
+  var postUrl = form.getPublishedUrl().replace(/\/viewform.*$/, '/formResponse');
+  var payload = { u: postUrl, e: m[1], t: token };
+  return 'KL1.' + Utilities.base64Encode(JSON.stringify(payload));
+}
 
-  // 初回接続: トークン未登録なら、このトークンを登録して以後の合言葉にする
-  if (body.action === 'init') {
-    if (stored) {
-      if (stored === token) return { ok: true, initialized: false };
-      return { ok: false, error: 'すでに別の端末と連携済みです。再連携するにはシートのメニュー「📱 Macアプリ連携」からリセットしてください' };
+/** 連携フォームへの送信で即時発火。payload = JSON {token, action, ...} */
+function onBridgeSubmit(e) {
+  var raw = '';
+  try {
+    var responses = e.response.getItemResponses();
+    if (responses.length > 0) raw = String(responses[0].getResponse() || '');
+    var body = JSON.parse(raw);
+    var stored = PropertiesService.getScriptProperties().getProperty('BRIDGE_TOKEN');
+    if (!stored || body.token !== stored) return; // 部外者の投稿は黙って無視
+
+    switch (body.action) {
+      case 'sendUrl':
+        var result = bridgeSendUrl_(String(body.url || ''), String(body.title || ''));
+        if (!result.ok) {
+          throw new Error('Macアプリからの記事送信に失敗: ' + result.error + '（URL: ' + body.url + '）');
+        }
+        break;
+      default:
+        // 未知のactionは無視（将来の拡張分を旧版が受けても壊れないように）
+        break;
     }
-    if (token.length < 16) return { ok: false, error: 'トークンが短すぎます' };
-    props.setProperty('BRIDGE_TOKEN', token);
-    return { ok: true, initialized: true };
-  }
-
-  if (!stored || token !== stored) {
-    return { ok: false, error: 'unauthorized' };
-  }
-
-  switch (body.action) {
-    case 'ping':
-      return { ok: true, version: SCRIPT_VERSION };
-    case 'sendUrl':
-      return bridgeSendUrl_(String(body.url || ''), String(body.title || ''));
-    default:
-      return { ok: false, error: '不明なaction: ' + body.action };
+  } catch (err) {
+    notifyError_(err);
   }
 }
 
@@ -108,32 +154,18 @@ function bridgeDecodeTitle_(raw) {
     .trim();
 }
 
-/** メニュー「📱 Macアプリ連携」: WebアプリURLと連携状態を表示する */
+/** メニュー「📱 Macアプリ連携」: 連携コードの表示（必要ならフォーム作成から） */
 function showBridgeInfo() {
   var ui = SpreadsheetApp.getUi();
-  var url = '';
-  try {
-    url = ScriptApp.getService().getUrl() || '';
-  } catch (e) {}
-  var stored = PropertiesService.getScriptProperties().getProperty('BRIDGE_TOKEN');
-  var lines = [];
-  if (url) {
-    lines.push('WebアプリURL（Macアプリの「配信」タブに貼り付け）:');
-    lines.push(url);
-  } else {
-    lines.push('まだWebアプリとしてデプロイされていません。');
-    lines.push('拡張機能 → Apps Script → デプロイ → 新しいデプロイ → 種類「ウェブアプリ」');
-    lines.push('（自分として実行 / 全員がアクセス可能）でデプロイしてください。');
+  ensureBridgeForm_();
+  var code = bridgeCode_();
+  if (!code) {
+    ui.alert('連携コードを作成できませんでした。「① 初期セットアップ」を実行してからもう一度お試しください。');
+    return;
   }
-  lines.push('');
-  lines.push('連携状態: ' + (stored ? '連携済み' : '未連携（Macアプリ側でURLを保存すると自動で連携されます）'));
-  var res = ui.alert(
+  ui.alert(
     '📱 Macアプリ連携',
-    lines.join('\n') + (stored ? '\n\n「OK」で連携を維持 / 「キャンセル」で連携をリセット（再連携できるようになります）' : ''),
-    stored ? ui.ButtonSet.OK_CANCEL : ui.ButtonSet.OK
+    '下の連携コードをコピーして、Macアプリの「配信」タブに貼り付けてください。\n\n' + code,
+    ui.ButtonSet.OK
   );
-  if (stored && res === ui.Button.CANCEL) {
-    PropertiesService.getScriptProperties().deleteProperty('BRIDGE_TOKEN');
-    ui.alert('連携をリセットしました。Macアプリ側でURLを保存し直すと再連携されます。');
-  }
 }
