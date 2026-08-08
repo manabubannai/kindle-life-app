@@ -67,7 +67,8 @@ function bridgeCode_() {
   var m = prefill.match(/[?&]entry\.(\d+)=/);
   if (!m) return null;
   var postUrl = form.getPublishedUrl().replace(/\/viewform.*$/, '/formResponse');
-  var payload = { u: postUrl, e: m[1], t: token };
+  // s = シートのURL。Macアプリが「シートを開く」ボタンに使う
+  var payload = { u: postUrl, e: m[1], t: token, s: ss_().getUrl() };
   return 'KL1.' + Utilities.base64Encode(JSON.stringify(payload));
 }
 
@@ -87,6 +88,22 @@ function onBridgeSubmit(e) {
         if (!result.ok) {
           throw new Error('Macアプリからの記事送信に失敗: ' + result.error + '（URL: ' + body.url + '）');
         }
+        break;
+      case 'addNewsletter':
+        var ra = bridgeUpsertRow_('NEWSLETTER_LIST', String(body.email || ''), String(body.digestTitle || ''));
+        if (!ra.ok) throw new Error('Macアプリからのメルマガ購読追加に失敗: ' + ra.error);
+        break;
+      case 'removeNewsletter':
+        var rr = bridgeRemoveRow_('NEWSLETTER_LIST', String(body.email || ''));
+        if (!rr.ok) throw new Error('Macアプリからのメルマガ購読解除に失敗: ' + rr.error);
+        break;
+      case 'addFeed':
+        var fa = bridgeUpsertRow_('BLOG_LIST', String(body.url || ''), null);
+        if (!fa.ok) throw new Error('Macアプリからのブログ購読追加に失敗: ' + fa.error);
+        break;
+      case 'removeFeed':
+        var fr = bridgeRemoveRow_('BLOG_LIST', String(body.url || ''));
+        if (!fr.ok) throw new Error('Macアプリからのブログ購読解除に失敗: ' + fr.error);
         break;
       default:
         // 未知のactionは無視（将来の拡張分を旧版が受けても壊れないように）
@@ -141,6 +158,68 @@ function bridgeSendUrl_(url, titleHint) {
   return { ok: true, title: title };
 }
 
+/**
+ * 購読入力エリアへの追加・更新（Macアプリから）。
+ * 値が既にあれば上書き（メルマガは週1まとめタイトルの更新）、無ければ空き行へ。
+ * 空き行が無いときは範囲内に1行挿入してnamed rangeごと広げる。
+ */
+function bridgeUpsertRow_(rangeName, value, digestTitle) {
+  value = String(value || '').trim();
+  if (rangeName === 'NEWSLETTER_LIST' && value.indexOf('@') === -1) {
+    return { ok: false, error: 'メールアドレスの形式ではありません: ' + value };
+  }
+  if (rangeName === 'BLOG_LIST' && !/^https?:\/\//i.test(value)) {
+    return { ok: false, error: 'URLの形式ではありません: ' + value };
+  }
+  var range = ss_().getRangeByName(rangeName);
+  if (!range) return { ok: false, error: 'シートに入力欄が見つかりません（「① 初期セットアップ」を実行してください）' };
+
+  var values = range.getValues();
+  var target = -1;
+  var empty = -1;
+  for (var i = 0; i < values.length; i++) {
+    var v = String(values[i][0] || '').trim();
+    if (v.toLowerCase() === value.toLowerCase()) { target = i; break; }
+    if (v === '' && empty === -1) empty = i;
+  }
+  if (target === -1 && empty === -1) {
+    range.getSheet().insertRowBefore(range.getLastRow());
+    range = ss_().getRangeByName(rangeName);
+    values = range.getValues();
+    for (var j = 0; j < values.length; j++) {
+      if (String(values[j][0] || '').trim() === '') { empty = j; break; }
+    }
+    if (empty === -1) return { ok: false, error: '入力欄に空き行を作れませんでした' };
+  }
+  if (target === -1) target = empty;
+
+  range.getCell(target + 1, 1).setValue(value);
+  if (rangeName === 'NEWSLETTER_LIST') {
+    var titleRange = ss_().getRangeByName('NEWSLETTER_DIGEST_TITLES');
+    if (titleRange) titleRange.getCell(target + 1, 1).setValue(String(digestTitle || '').trim());
+  }
+  return { ok: true };
+}
+
+/** 購読入力エリアからの解除（Macアプリから）。行は消さずセルを空にする。 */
+function bridgeRemoveRow_(rangeName, value) {
+  value = String(value || '').trim();
+  var range = ss_().getRangeByName(rangeName);
+  if (!range) return { ok: false, error: 'シートに入力欄が見つかりません' };
+  var values = range.getValues();
+  for (var i = 0; i < values.length; i++) {
+    if (String(values[i][0] || '').trim().toLowerCase() === value.toLowerCase()) {
+      range.getCell(i + 1, 1).setValue('');
+      if (rangeName === 'NEWSLETTER_LIST') {
+        var titleRange = ss_().getRangeByName('NEWSLETTER_DIGEST_TITLES');
+        if (titleRange) titleRange.getCell(i + 1, 1).setValue('');
+      }
+      return { ok: true };
+    }
+  }
+  return { ok: true }; // 既に無ければ成功扱い
+}
+
 /** <title>の中身を表示用テキストに（タグ除去・主要エンティティのみ復元） */
 function bridgeDecodeTitle_(raw) {
   return String(raw)
@@ -154,7 +233,7 @@ function bridgeDecodeTitle_(raw) {
     .trim();
 }
 
-/** メニュー「📱 Macアプリ連携」: 連携コードの表示（必要ならフォーム作成から） */
+/** メニュー「📱 Macアプリ連携」: ワンクリック接続ダイアログ（必要ならフォーム作成から） */
 function showBridgeInfo() {
   var ui = SpreadsheetApp.getUi();
   ensureBridgeForm_();
@@ -163,9 +242,28 @@ function showBridgeInfo() {
     ui.alert('連携コードを作成できませんでした。「① 初期セットアップ」を実行してからもう一度お試しください。');
     return;
   }
-  ui.alert(
-    '📱 Macアプリ連携',
-    '下の連携コードをコピーして、Macアプリの「配信」タブに貼り付けてください。\n\n' + code,
-    ui.ButtonSet.OK
-  );
+  var appLink = 'kindlelife://connect?code=' + encodeURIComponent(code);
+  var html = HtmlService.createHtmlOutput(
+    '<div style="font-family:-apple-system,BlinkMacSystemFont,\'Hiragino Sans\',sans-serif;font-size:13px;line-height:1.7;color:#202124">' +
+      '<p style="margin-top:0">下のボタンを押すと、Macアプリ「Kindle Life」が開いて自動で接続されます。</p>' +
+      '<p style="text-align:center;margin:18px 0">' +
+        '<a href="' + appLink + '" target="_blank" style="display:inline-block;background:#1a73e8;color:#fff;padding:10px 28px;border-radius:6px;text-decoration:none;font-weight:bold">🖥 Macアプリに接続する</a>' +
+      '</p>' +
+      '<p style="color:#5f6368">うまく開かない場合は、下のボタンでコードをコピーし、Macアプリの「配信」タブで「クリップボードから接続」を押してください。</p>' +
+      '<p style="text-align:center;margin:10px 0">' +
+        '<button onclick="copyCode()" style="padding:6px 16px;border-radius:6px;border:1px solid #dadce0;background:#fff;cursor:pointer">連携コードをコピー</button> ' +
+        '<span id="done" style="color:#188038"></span>' +
+      '</p>' +
+      '<textarea id="code" readonly style="width:100%;height:56px;font-size:11px;color:#5f6368;border:1px solid #dadce0;border-radius:6px;box-sizing:border-box">' + code + '</textarea>' +
+      '<script>' +
+        'function copyCode(){' +
+          'var ta=document.getElementById("code");ta.select();' +
+          'try{document.execCommand("copy")}catch(e){}' +
+          'if(navigator.clipboard){navigator.clipboard.writeText(ta.value).catch(function(){})}' +
+          'document.getElementById("done").textContent="コピーしました";' +
+        '}' +
+      '<\/script>' +
+    '</div>'
+  ).setWidth(440).setHeight(320);
+  ui.showModalDialog(html, '📱 Macアプリ連携');
 }
