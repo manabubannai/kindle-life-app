@@ -173,7 +173,7 @@ function bridgeUpsertRow_(rangeName, value, digestTitle) {
     return { ok: false, error: 'URLの形式ではありません: ' + value };
   }
   var range = ss_().getRangeByName(rangeName);
-  if (!range) return { ok: false, error: 'シートに入力欄が見つかりません（「① 初期セットアップ」を実行してください）' };
+  if (!range) return { ok: false, error: 'シートに入力欄が見つかりません（「✅ 初回セットアップ」を実行してください）' };
 
   var values = range.getValues();
   var target = -1;
@@ -241,7 +241,7 @@ function showBridgeInfo() {
   ensureBridgeForm_();
   var code = bridgeCode_();
   if (!code) {
-    ui.alert('連携コードを作成できませんでした。「① 初期セットアップ」を実行してからもう一度お試しください。');
+    ui.alert('連携コードを作成できませんでした。「✅ 初回セットアップ」を実行してからもう一度お試しください。');
     return;
   }
   var appLink = 'kindlelife://connect?code=' + encodeURIComponent(code);
@@ -267,5 +267,5 @@ function showBridgeInfo() {
       '<\/script>' +
     '</div>'
   ).setWidth(440).setHeight(320);
-  ui.showModalDialog(html, '📱 Macアプリ連携');
+  ui.showModalDialog(html, '🧑‍💻 Macアプリと連携');
 }

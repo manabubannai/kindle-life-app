@@ -11,16 +11,15 @@ function onOpen() {
   // 簡易トリガーの制限で失敗もするため廃止。整備は①初期セットアップ等で実行）
   SpreadsheetApp.getUi()
     .createMenu('Kindle Life')
-    .addItem('① 初期セットアップ（最初に1回）', 'initialSetup')
+    .addItem('✅ 初回セットアップ', 'initialSetup')
     .addSeparator()
-    .addItem('✉️ 今すぐ新着を確認して送信', 'runDeliveryNow')
-    .addItem('🧪 テスト送信（設定の確認用）', 'sendTestItem')
-    .addItem('🩺 診断', 'runDiagnostics')
+    .addItem('📝 テスト送信をする', 'sendTestItem')
+    .addItem('⏰ 新着を今すぐ送信', 'runDeliveryNow')
+    .addItem('🧑‍⚕️ バグを診断する', 'runDiagnostics')
     .addSeparator()
-    .addItem('📱 Macアプリ連携', 'showBridgeInfo')
+    .addItem('🧑‍💻 Macアプリと連携', 'showBridgeInfo')
     .addSeparator()
     .addItem('⏸ このシートを停止（トリガー削除）', 'stopAll')
-    .addItem('❓ ヘルプ', 'showHelp')
     .addToUi();
 }
 
@@ -67,7 +66,7 @@ function initialSetup() {
     '登録したメルマガとブログがKindleに自動送信されます。１時間に１件ずつのペースです。\n\n' +
     'なおAmazon側で「あなたのGmail」が登録されていないと、送信が弾かれます。設定方法は次のとおり。\n\n' +
     '・手順①：Amazonの「コンテンツと端末の管理 → 設定 → 承認済みEメールアドレス」に、あなたのGmailアドレスを追加してください\n' +
-    '・手順②：シート上部のメニューにある「🧪 テスト送信」で、実際に届くか確認しましょう';
+    '・手順②：シート上部のメニューにある「📝 テスト送信をする」で、実際に届くか確認しましょう';
   if (feedErrors.length > 0) {
     message += '\n\n⚠️ 一部のブログが登録できませんでした（URLの右横の表示を確認してください）:\n' + feedErrors.join('\n');
   }
