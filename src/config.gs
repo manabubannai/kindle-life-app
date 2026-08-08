@@ -233,7 +233,7 @@ function ensureLayout_() {
     SpreadsheetApp.newDataValidation()
       .requireFormulaSatisfied('=OR(ISBLANK(' + nlA1 + '),ISEMAIL(' + nlA1 + '))')
       .setAllowInvalid(true)
-      .setHelpText('メルマガの「差出人」のメールアドレスを貼り付けてください')
+      .setHelpText('メルマガの差出人のメールアドレスを貼り付けてください')
       .build()
   );
   const blA1 = sheet.getRange(h3.row, h3.col).getA1Notation();
