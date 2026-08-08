@@ -104,11 +104,6 @@ function buildMainSheet_(ss) {
         .setHelpText('メルマガの「差出人」のメールアドレスを貼り付けてください')
         .build()
     );
-  sheet.getRange('B12').setNote(
-    'Gmailでそのメルマガを開き、差出人名の横に表示されるアドレスをコピーして貼り付けます。\n' +
-    'やめたいときはセルを空にするだけです。'
-  );
-
   sheet.getRange('C12')
     .setValue('週1まとめのタイトル（任意）')
     .setFontWeight('bold').setFontColor('#666666');
@@ -134,11 +129,6 @@ function buildMainSheet_(ss) {
         .setHelpText('https:// で始まるブログのURLを入力してください')
         .build()
     );
-  sheet.getRange('E12').setNote(
-    'ブログのトップページのURLでOK（フィードの場所は自動で見つけ、ブログ名が右に表示されます）。\n' +
-    'やめたいときはセルを空にするだけです。'
-  );
-
   // ブログ状態（スクリプトが書く表示専用。説明書きは置かない — 自動で表示されれば分かる）
   sheet.getRange(LIST_TOP, 6, LIST_ROWS, 1).setFontSize(9).setFontColor('#666666');
 
