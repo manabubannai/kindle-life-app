@@ -107,8 +107,10 @@ function readNewsletters_(issues) {
   return range
     .getValues()
     .map(function (r, i) {
+      // セル内画像などの非文字列は空扱い（説明画像が範囲に入っても壊れない）
+      const raw = r[0] !== null && typeof r[0] === 'object' ? '' : r[0];
       return {
-        email: String(r[0] || '').trim(),
+        email: String(raw || '').trim(),
         digestTitle: String((titleValues[i] && titleValues[i][0]) || '').trim(),
       };
     })
@@ -130,7 +132,8 @@ function readBlogs_(issues) {
   return range
     .getValues()
     .map(function (r, i) {
-      return { row: firstRow + i, feed: String(r[0] || '').trim() };
+      const raw = r[0] !== null && typeof r[0] === 'object' ? '' : r[0];
+      return { row: firstRow + i, feed: String(raw || '').trim() };
     })
     .filter(function (x) {
       if (x.feed === '') return false;
@@ -173,6 +176,23 @@ function ensureLayout_() {
   if (!h1 || !h2 || !h3) return;
   const digestCol = h2.col + 1 === h3.col ? 8 : h2.col + 1;
 
+  // シートの行数・列数が足りない場合は範囲をはみ出させない（例外→サイレント失敗を防ぐ）
+  // さらに見出しの下に説明画像などの「文字列でないセル」があれば、入力範囲はその手前まで
+  const usableRows = function (row, col) {
+    const cap = Math.max(1, Math.min(ROWS, sheet.getMaxRows() - row + 1));
+    const vals = sheet.getRange(row, col, cap, 1).getValues();
+    for (let i = 0; i < vals.length; i++) {
+      const v = vals[i][0];
+      if (v !== '' && v !== null && typeof v === 'object') return Math.max(1, i);
+    }
+    return cap;
+  };
+  const nlRows = usableRows(h2.row, h2.col);
+  const blRows = usableRows(h3.row, h3.col);
+  if (digestCol > sheet.getMaxColumns()) {
+    sheet.insertColumnsAfter(sheet.getMaxColumns(), digestCol - sheet.getMaxColumns());
+  }
+
   // 張り替え前に週1まとめタイトルを退避（差出人アドレス→タイトル）
   const titles = {};
   try {
@@ -190,9 +210,9 @@ function ensureLayout_() {
   } catch (e) { /* 退避失敗は無視（初回構築時など） */ }
 
   ss.setNamedRange('KINDLE_EMAIL', sheet.getRange(h1.row, h1.col));
-  ss.setNamedRange('NEWSLETTER_LIST', sheet.getRange(h2.row, h2.col, ROWS, 1));
-  ss.setNamedRange('BLOG_LIST', sheet.getRange(h3.row, h3.col, ROWS, 1));
-  ss.setNamedRange('NEWSLETTER_DIGEST_TITLES', sheet.getRange(h2.row, digestCol, ROWS, 1));
+  ss.setNamedRange('NEWSLETTER_LIST', sheet.getRange(h2.row, h2.col, nlRows, 1));
+  ss.setNamedRange('BLOG_LIST', sheet.getRange(h3.row, h3.col, blRows, 1));
+  ss.setNamedRange('NEWSLETTER_DIGEST_TITLES', sheet.getRange(h2.row, digestCol, nlRows, 1));
   if (digestCol === 8) sheet.hideColumns(digestCol);
 
   // 旧位置に残った入力規則の赤マークとセルメモを消し、新しい入力欄に張り直す
@@ -207,7 +227,7 @@ function ensureLayout_() {
       .build()
   );
   const nlA1 = sheet.getRange(h2.row, h2.col).getA1Notation();
-  sheet.getRange(h2.row, h2.col, ROWS, 1).setDataValidation(
+  sheet.getRange(h2.row, h2.col, nlRows, 1).setDataValidation(
     SpreadsheetApp.newDataValidation()
       .requireFormulaSatisfied('=OR(ISBLANK(' + nlA1 + '),ISEMAIL(' + nlA1 + '))')
       .setAllowInvalid(true)
@@ -215,7 +235,7 @@ function ensureLayout_() {
       .build()
   );
   const blA1 = sheet.getRange(h3.row, h3.col).getA1Notation();
-  sheet.getRange(h3.row, h3.col, ROWS, 1).setDataValidation(
+  sheet.getRange(h3.row, h3.col, blRows, 1).setDataValidation(
     SpreadsheetApp.newDataValidation()
       .requireFormulaSatisfied('=OR(ISBLANK(' + blA1 + '),REGEXMATCH(TO_TEXT(' + blA1 + '),"^https?://"))')
       .setAllowInvalid(true)
@@ -224,12 +244,12 @@ function ensureLayout_() {
   );
 
   // 退避したタイトルを新しい位置へ書き戻す
-  const emails = sheet.getRange(h2.row, h2.col, ROWS, 1).getValues();
   if (Object.keys(titles).length > 0) {
+    const emails = sheet.getRange(h2.row, h2.col, nlRows, 1).getValues();
     const out = emails.map(function (r) {
       return [titles[String(r[0] || '').trim().toLowerCase()] || ''];
     });
-    sheet.getRange(h2.row, digestCol, ROWS, 1).setValues(out);
+    sheet.getRange(h2.row, digestCol, nlRows, 1).setValues(out);
   }
   appendLog_('レイアウト', '入力欄の位置をシートの見出しに合わせて更新', '');
 }
