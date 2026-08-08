@@ -220,6 +220,11 @@ function ensureLayout_() {
   const wholeGrid = sheet.getRange(1, 1, sheet.getMaxRows(), sheet.getMaxColumns());
   wholeGrid.clearDataValidations();
   wholeGrid.clearNote();
+
+  // 見出しセルのヘルプ（ホバーで常時見えるメモ。入力規則のヘルプは違反時のみ表示のため）
+  sheet.getRange(h1.row - 1, h1.col).setNote('@kindle.com で終わるアドレスを入力してください');
+  sheet.getRange(h2.row - 1, h2.col).setNote('メルマガの差出人のメールアドレスを貼り付けてください');
+  sheet.getRange(h3.row - 1, h3.col).setNote('https:// で始まるブログのURLを入れてください');
   const kindleA1 = sheet.getRange(h1.row, h1.col).getA1Notation();
   sheet.getRange(h1.row, h1.col).setDataValidation(
     SpreadsheetApp.newDataValidation()
