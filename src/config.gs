@@ -208,6 +208,33 @@ function ensureLayout_() {
   ss.setNamedRange('NEWSLETTER_DIGEST_TITLES', sheet.getRange(h2.row, digestCol, ROWS, 1));
   if (digestCol === 8) sheet.hideColumns(digestCol);
 
+  // 旧位置に残った入力規則の赤マークを消し、新しい入力欄に張り直す
+  sheet.getDataRange().clearDataValidations();
+  const kindleA1 = sheet.getRange(h1.row, h1.col).getA1Notation();
+  sheet.getRange(h1.row, h1.col).setDataValidation(
+    SpreadsheetApp.newDataValidation()
+      .requireFormulaSatisfied('=OR(ISBLANK(' + kindleA1 + '),REGEXMATCH(TO_TEXT(' + kindleA1 + '),"@kindle\\.com$"))')
+      .setAllowInvalid(true)
+      .setHelpText('@kindle.com で終わるアドレスを入力してください')
+      .build()
+  );
+  const nlA1 = sheet.getRange(h2.row, h2.col).getA1Notation();
+  sheet.getRange(h2.row, h2.col, ROWS, 1).setDataValidation(
+    SpreadsheetApp.newDataValidation()
+      .requireFormulaSatisfied('=OR(ISBLANK(' + nlA1 + '),ISEMAIL(' + nlA1 + '))')
+      .setAllowInvalid(true)
+      .setHelpText('メルマガの「差出人」のメールアドレスを貼り付けてください')
+      .build()
+  );
+  const blA1 = sheet.getRange(h3.row, h3.col).getA1Notation();
+  sheet.getRange(h3.row, h3.col, ROWS, 1).setDataValidation(
+    SpreadsheetApp.newDataValidation()
+      .requireFormulaSatisfied('=OR(ISBLANK(' + blA1 + '),REGEXMATCH(TO_TEXT(' + blA1 + '),"^https?://"))')
+      .setAllowInvalid(true)
+      .setHelpText('https:// で始まるブログのURLを入れてください')
+      .build()
+  );
+
   // 退避したタイトルを新しい位置へ書き戻す
   const emails = sheet.getRange(h2.row, h2.col, ROWS, 1).getValues();
   if (Object.keys(titles).length > 0) {
