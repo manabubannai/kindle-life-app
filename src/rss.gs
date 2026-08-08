@@ -90,6 +90,10 @@ function discoverFeedUrl_(inputUrl) {
   // 1. 入力URL自体がフィードならそのまま使う
   const first = fetchUrlKind_(inputUrl);
   if (first.kind === 'feed') return inputUrl;
+  if (first.blocked) {
+    // bot対策でプログラムからのアクセス自体を拒否するサイト（bearblog等）は登録不可
+    throw new Error('このブログはプログラムからのアクセスをブロックしているため、登録できません（サイト側のbot対策）');
+  }
 
   // 2. HTMLページなら <link rel="alternate" type="application/rss+xml"> を探す（標準の自動検出）
   if (first.kind === 'html') {
@@ -111,6 +115,7 @@ function discoverFeedUrl_(inputUrl) {
 function fetchUrlKind_(url) {
   try {
     const resp = UrlFetchApp.fetch(url, { muteHttpExceptions: true, followRedirects: true });
+    if (resp.getResponseCode() === 403) return { kind: 'error', blocked: true };
     if (resp.getResponseCode() !== 200) return { kind: 'error' };
     const text = resp.getContentText();
     try {
