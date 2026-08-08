@@ -173,19 +173,6 @@ function ensureLayout_() {
   if (!h1 || !h2 || !h3) return;
   const digestCol = h2.col + 1 === h3.col ? 8 : h2.col + 1;
 
-  const inPlace = function (name, row, col) {
-    const r = ss.getRangeByName(name);
-    return r && r.getSheet().getName() === SHEET_MAIN && r.getRow() === row && r.getColumn() === col;
-  };
-  if (
-    inPlace('KINDLE_EMAIL', h1.row, h1.col) &&
-    inPlace('NEWSLETTER_LIST', h2.row, h2.col) &&
-    inPlace('BLOG_LIST', h3.row, h3.col) &&
-    inPlace('NEWSLETTER_DIGEST_TITLES', h2.row, digestCol)
-  ) {
-    return;
-  }
-
   // 張り替え前に週1まとめタイトルを退避（差出人アドレス→タイトル）
   const titles = {};
   try {
