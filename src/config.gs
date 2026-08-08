@@ -251,11 +251,15 @@ function ensureLayout_() {
     });
     sheet.getRange(h2.row, digestCol, nlRows, 1).setValues(out);
   }
-  // メインタブ以外（説明用など）は誤編集防止の保護をかける（編集しようとすると警告）
+  // メインタブ以外（説明用など）: 貼り付けで紛れ込んだ入力規則・メモを掃除し、
+  // 誤編集防止の保護をかける（編集しようとすると警告）
   ss.getSheets().forEach(function (sh) {
     if (sh.getName() === SHEET_MAIN) return;
-    if (sh.getProtections(SpreadsheetApp.ProtectionType.SHEET).length > 0) return;
-    sh.protect().setWarningOnly(true).setDescription('Kindle Life: このタブは編集不要です');
+    sh.getDataRange().clearDataValidations();
+    sh.getDataRange().clearNote();
+    if (sh.getProtections(SpreadsheetApp.ProtectionType.SHEET).length === 0) {
+      sh.protect().setWarningOnly(true).setDescription('Kindle Life: このタブは編集不要です');
+    }
   });
 
   appendLog_('レイアウト', '入力欄の位置をシートの見出しに合わせて更新', '');
