@@ -220,6 +220,19 @@ function ensureLayout_() {
   const wholeGrid = sheet.getRange(1, 1, sheet.getMaxRows(), sheet.getMaxColumns());
   wholeGrid.clearDataValidations();
   wholeGrid.clearNote();
+
+  // ヘルプ文言の表示（B16〜B18。空の時だけ書く — 手で編集した文言は上書きしない）
+  const helpLines = [
+    '@kindle.com で終わるアドレスを入力してください',
+    'メルマガの差出人のメールアドレスを貼り付けてください',
+    'https:// で始まるブログのURLを入れてください',
+  ];
+  if (sheet.getMaxRows() >= 18) {
+    helpLines.forEach(function (text, i) {
+      const cell = sheet.getRange(16 + i, 2);
+      if (String(cell.getValue() || '') === '') cell.setValue(text);
+    });
+  }
   const kindleA1 = sheet.getRange(h1.row, h1.col).getA1Notation();
   sheet.getRange(h1.row, h1.col).setDataValidation(
     SpreadsheetApp.newDataValidation()
