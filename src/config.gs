@@ -216,8 +216,10 @@ function ensureLayout_() {
   if (digestCol === 8) sheet.hideColumns(digestCol);
 
   // 旧位置に残った入力規則の赤マークとセルメモを消し、新しい入力欄に張り直す
-  sheet.getDataRange().clearDataValidations();
-  sheet.getDataRange().clearNote();
+  // （データの有無に関わらずグリッド全体。空セル領域に残った断片も消すため）
+  const wholeGrid = sheet.getRange(1, 1, sheet.getMaxRows(), sheet.getMaxColumns());
+  wholeGrid.clearDataValidations();
+  wholeGrid.clearNote();
   const kindleA1 = sheet.getRange(h1.row, h1.col).getA1Notation();
   sheet.getRange(h1.row, h1.col).setDataValidation(
     SpreadsheetApp.newDataValidation()
@@ -255,8 +257,9 @@ function ensureLayout_() {
   // 誤編集防止の保護をかける（編集しようとすると警告）
   ss.getSheets().forEach(function (sh) {
     if (sh.getName() === SHEET_MAIN) return;
-    sh.getDataRange().clearDataValidations();
-    sh.getDataRange().clearNote();
+    const grid = sh.getRange(1, 1, sh.getMaxRows(), sh.getMaxColumns());
+    grid.clearDataValidations();
+    grid.clearNote();
     if (sh.getProtections(SpreadsheetApp.ProtectionType.SHEET).length === 0) {
       sh.protect().setWarningOnly(true).setDescription('Kindle Life: このタブは編集不要です');
     }
