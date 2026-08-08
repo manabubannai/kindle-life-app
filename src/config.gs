@@ -190,36 +190,14 @@ function ensureLayout_() {
   const nlRows = usableRows(h2.row, h2.col);
   const blRows = usableRows(h3.row, h3.col);
 
-  // 1) 掃除と入力規則の張り直し（最優先。他の処理が失敗しても必ず走らせる）
+  // 1) 入力規則とセルメモの全削除（最優先。入力チェックは①初期セットアップ時の
+  //    readConfig_ が日本語のダイアログで行うため、セル上の規則・メモは一切置かない）
   try {
-    // 旧位置に残った規則の断片を全消し（データの有無に関わらずグリッド全体。メモは消さない）
-    sheet.getRange(1, 1, sheet.getMaxRows(), sheet.getMaxColumns()).clearDataValidations();
-    const kindleA1 = sheet.getRange(h1.row, h1.col).getA1Notation();
-    sheet.getRange(h1.row, h1.col).setDataValidation(
-      SpreadsheetApp.newDataValidation()
-        .requireFormulaSatisfied('=OR(ISBLANK(' + kindleA1 + '),REGEXMATCH(TO_TEXT(' + kindleA1 + '),"@kindle\\.com$"))')
-        .setAllowInvalid(true)
-        .setHelpText('@kindle.com で終わるアドレスを入力してください')
-        .build()
-    );
-    const nlA1 = sheet.getRange(h2.row, h2.col).getA1Notation();
-    sheet.getRange(h2.row, h2.col, nlRows, 1).setDataValidation(
-      SpreadsheetApp.newDataValidation()
-        .requireFormulaSatisfied('=OR(ISBLANK(' + nlA1 + '),ISEMAIL(' + nlA1 + '))')
-        .setAllowInvalid(true)
-        .setHelpText('メルマガの差出人のメールアドレスを貼り付けてください')
-        .build()
-    );
-    const blA1 = sheet.getRange(h3.row, h3.col).getA1Notation();
-    sheet.getRange(h3.row, h3.col, blRows, 1).setDataValidation(
-      SpreadsheetApp.newDataValidation()
-        .requireFormulaSatisfied('=OR(ISBLANK(' + blA1 + '),REGEXMATCH(TO_TEXT(' + blA1 + '),"^https?://"))')
-        .setAllowInvalid(true)
-        .setHelpText('https:// で始まるブログのURLを入れてください')
-        .build()
-    );
+    const wholeGrid = sheet.getRange(1, 1, sheet.getMaxRows(), sheet.getMaxColumns());
+    wholeGrid.clearDataValidations();
+    wholeGrid.clearNote();
   } catch (e) {
-    console.error('入力規則の張り直し失敗: ' + e);
+    console.error('入力規則・メモの削除失敗: ' + e);
   }
 
   // 2) named range の張り直し（週1まとめタイトルの退避・復元つき）
