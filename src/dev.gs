@@ -62,10 +62,10 @@ function buildMainSheet_(ss) {
   sheet.getRange('B2').setValue('Kindle Life').setFontSize(20).setFontWeight('bold');
   sheet.getRange('B3').setValue(SHEET_TAGLINE).setFontSize(11);
   sheet.getRange('B5')
-    .setValue('使いかた: 下の赤い①〜③を埋める → 上のメニュー「Kindle Life」→「① 初期セットアップ」→ Googleの画面で「詳細」→「移動」→「許可」')
+    .setValue(SHEET_HOWTO_1)
     .setFontSize(11).setFontWeight('bold');
   sheet.getRange('B6')
-    .setValue('最後にAmazonの「コンテンツと端末の管理」→「設定」→「承認済みEメールアドレス」にあなたのGmailアドレスを追加して、メニューの「🧪 テスト送信」で確認。')
+    .setValue(SHEET_HOWTO_2)
     .setFontSize(11);
 
   // ── ① Kindleメールアドレス ──

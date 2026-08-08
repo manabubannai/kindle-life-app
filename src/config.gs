@@ -20,8 +20,12 @@ const GUIDE_URL = 'https://github.com/manabubannai/kindle-life-app';
 // UIタブ（1枚だけ）
 const SHEET_MAIN = 'Kindle Life';
 
-// シート上部のキャッチコピー（B3）。dev.gsの構築と毎時の自動更新の両方で使う
+// シート上部のキャッチコピー（B3）と使いかた（B5/B6）。dev.gsの構築と毎時の自動更新の両方で使う
 const SHEET_TAGLINE = 'メルマガとブログを、届いた順に1件ずつKindleへ。';
+const SHEET_HOWTO_1 = '使いかた: 下の赤い①〜③を埋めて、メニュー「Kindle Life」→「① 初期セットアップ」を実行するだけ。（Googleの確認画面が出たら「詳細」→「移動」→「許可」の順にクリックすればOKです）';
+const SHEET_HOWTO_2 = '仕上げに、Amazonサイトの「コンテンツと端末の管理」→「設定」→「承認済みEメールアドレス」へ、このシートを使っているGmailアドレスを追加。メニューの「🧪 テスト送信」がKindleに届いたら完成です。';
+// 説明文の版。文言を変えたらこの数字を上げると、稼働中のシートにも毎時実行が書き込む
+const UI_TEXT_VERSION = '2';
 
 // 1回の毎時実行で送る記事数の上限。初回の溜まり分や暴走フィードでの
 // 大量送信を防ぐ（残りは次の毎時実行に持ち越されるため取りこぼしはない）
