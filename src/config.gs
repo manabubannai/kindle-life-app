@@ -217,22 +217,9 @@ function ensureLayout_() {
 
   // 旧位置に残った入力規則の赤マークとセルメモを消し、新しい入力欄に張り直す
   // （データの有無に関わらずグリッド全体。空セル領域に残った断片も消すため）
+  // 入力規則はグリッド全体を掃除して張り直す（メモは消さない — 手作りのヘルプを尊重）
   const wholeGrid = sheet.getRange(1, 1, sheet.getMaxRows(), sheet.getMaxColumns());
   wholeGrid.clearDataValidations();
-  wholeGrid.clearNote();
-
-  // ヘルプ文言の表示（B16〜B18。空の時だけ書く — 手で編集した文言は上書きしない）
-  const helpLines = [
-    '@kindle.com で終わるアドレスを入力してください',
-    'メルマガの差出人のメールアドレスを貼り付けてください',
-    'https:// で始まるブログのURLを入れてください',
-  ];
-  if (sheet.getMaxRows() >= 18) {
-    helpLines.forEach(function (text, i) {
-      const cell = sheet.getRange(16 + i, 2);
-      if (String(cell.getValue() || '') === '') cell.setValue(text);
-    });
-  }
   const kindleA1 = sheet.getRange(h1.row, h1.col).getA1Notation();
   sheet.getRange(h1.row, h1.col).setDataValidation(
     SpreadsheetApp.newDataValidation()
