@@ -114,7 +114,7 @@ function discoverFeedUrl_(inputUrl) {
 /** URLを取得して 'feed' / 'html' / 'error' に分類する。feedの判定はXMLのルート要素で行う。 */
 function fetchUrlKind_(url) {
   try {
-    const resp = UrlFetchApp.fetch(url, { muteHttpExceptions: true, followRedirects: true });
+    const resp = UrlFetchApp.fetch(url, { muteHttpExceptions: true, followRedirects: true, headers: { 'User-Agent': BROWSER_UA_ } });
     if (resp.getResponseCode() === 403) return { kind: 'error', blocked: true };
     if (resp.getResponseCode() !== 200) return { kind: 'error' };
     const text = resp.getContentText();
@@ -160,7 +160,7 @@ function absolutizeUrl_(url, baseUrl) {
  * （メモ列を持たないぶん、表示名はフィードから自動で得る）。
  */
 function fetchFeed_(feedUrl) {
-  const resp = UrlFetchApp.fetch(feedUrl, { muteHttpExceptions: true });
+  const resp = UrlFetchApp.fetch(feedUrl, { muteHttpExceptions: true, headers: { 'User-Agent': BROWSER_UA_ } });
   if (resp.getResponseCode() !== 200) {
     throw new Error('フィードを取得できません（HTTP ' + resp.getResponseCode() + '）');
   }
@@ -230,7 +230,7 @@ function parseAtom_(root) {
 function fetchArticleBody_(item, budget) {
   if (Date.now() > budget.deadline) return fallbackBody_(item);
   try {
-    const resp = UrlFetchApp.fetch(item.link, { muteHttpExceptions: true });
+    const resp = UrlFetchApp.fetch(item.link, { muteHttpExceptions: true, headers: { 'User-Agent': BROWSER_UA_ } });
     if (resp.getResponseCode() !== 200) return fallbackBody_(item);
     const pageHtml = resp.getContentText();
     const articleMatch = pageHtml.match(/<article[\s>][\s\S]*?<\/article\s*>/i);

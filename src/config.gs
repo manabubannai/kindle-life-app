@@ -55,6 +55,10 @@ const DIGEST_OVERDUE_MS = 9 * 24 * 60 * 60 * 1000;
 // 再開時にここまでの新着は拾う（それ以前の分は大量送信を防ぐため見送る）
 const MAX_WINDOW_MS = 3 * 24 * 60 * 60 * 1000;
 
+// フィード・記事・画像取得時のUser-Agent。一部のブログは既定のGAS UAを
+// 403でブロックするため、ブラウザ相当のUAを名乗る（無視される環境でも無害）
+const BROWSER_UA_ = 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0 Safari/537.36';
+
 function ss_() {
   return SpreadsheetApp.getActiveSpreadsheet();
 }

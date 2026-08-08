@@ -120,7 +120,7 @@ function fetchImageAsDataUri_(url) {
     'image/bmp': true,
   };
   try {
-    const resp = UrlFetchApp.fetch(url, { muteHttpExceptions: true });
+    const resp = UrlFetchApp.fetch(url, { muteHttpExceptions: true, headers: { 'User-Agent': BROWSER_UA_ } });
     if (resp.getResponseCode() !== 200) return null;
     const blob = resp.getBlob();
     const type = (blob.getContentType() || '').toLowerCase().split(';')[0];
