@@ -6,25 +6,6 @@
  * （＝「① 初期セットアップ」が認証の入り口を兼ねる）。
  */
 
-/**
- * シート上の説明文をコードの最新文言に合わせる（文言の版が変わった初回だけ書き込む）。
- * 更新版のコードをpushしただけでシートの表示が古いまま、を毎時実行が自動で直す。
- */
-function ensureSheetTexts_() {
-  if (getStateValue_('uiTextVersion') === UI_TEXT_VERSION) return;
-  try {
-    const sheet = ss_().getSheetByName(SHEET_MAIN);
-    if (!sheet) return;
-    sheet.getRange('B3').setValue(SHEET_TAGLINE);
-    sheet.getRange('B5').setValue(SHEET_HOWTO_1);
-    sheet.getRange('B6').setValue(SHEET_HOWTO_2);
-    setStateValue_('uiTextVersion', UI_TEXT_VERSION);
-    appendLog_('表示更新', 'シートの説明文を最新の文言に更新', '');
-  } catch (e) {
-    console.error('説明文の更新失敗: ' + e);
-  }
-}
-
 function onOpen() {
   SpreadsheetApp.getUi()
     .createMenu('Kindle Life')
@@ -48,6 +29,7 @@ function onOpen() {
 function initialSetup() {
   const ui = SpreadsheetApp.getUi();
 
+  ensureLayout_(); // シートの見出し位置に入力欄のnamed rangeを合わせる
   const config = readConfig_();
   if (config.issues.length > 0) {
     ui.alert('先にここを直してください', '・' + config.issues.join('\n\n・'), ui.ButtonSet.OK);

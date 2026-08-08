@@ -20,12 +20,9 @@ const GUIDE_URL = 'https://github.com/manabubannai/kindle-life-app';
 // UIタブ（1枚だけ）
 const SHEET_MAIN = 'Kindle Life';
 
-// シート上部のキャッチコピー（B3）と使いかた（B5/B6）。dev.gsの構築と毎時の自動更新の両方で使う
+// シート上部のキャッチコピー（B3）。dev.gsの構築で使う
+// （説明文はシート上のデザインが正。コードからは書き換えない）
 const SHEET_TAGLINE = 'メルマガとブログを、届いた順に1件ずつKindleへ。';
-const SHEET_HOWTO_1 = '使いかた: 下の赤い①〜③を埋めて、メニュー「Kindle Life」→「① 初期セットアップ」を実行するだけ。（Googleの確認画面が出たら「詳細」→「移動」→「許可」の順にクリックすればOKです）';
-const SHEET_HOWTO_2 = '仕上げに、Amazonサイトの「コンテンツと端末の管理」→「設定」→「承認済みEメールアドレス」へ、このシートを使っているGmailアドレスを追加。メニューの「🧪 テスト送信」がKindleに届いたら完成です。';
-// 説明文の版。文言を変えたらこの数字を上げると、稼働中のシートにも毎時実行が書き込む
-const UI_TEXT_VERSION = '2';
 
 // 1回の毎時実行で送る記事数の上限。初回の溜まり分や暴走フィードでの
 // 大量送信を防ぐ（残りは次の毎時実行に持ち越されるため取りこぼしはない）
@@ -146,6 +143,82 @@ function readBlogs_(issues) {
 }
 
 /** ブログURLの右隣のセルに取得結果（ブログ名・エラー）を書く。 */
+/**
+ * 入力用named rangeの自己修復。
+ * シートの「①」「②」「③」で始まる見出しセルを探し、その位置を基準に
+ * KINDLE_EMAIL / NEWSLETTER_LIST / BLOG_LIST / NEWSLETTER_DIGEST_TITLES を張り直す。
+ * デザイン変更（行・列の移動、テンプレの作り直し）をしてもコードが追従できる。
+ * - ① の直下1セル = Kindleアドレス
+ * - ② の直下〜40行 = メルマガ差出人
+ * - ③ の直下〜40行 = ブログURL（状態表示はその右隣）
+ * - 週1まとめタイトルは②の右隣。ただしそこが③の列なら隠しH列に置く
+ * 見出しが見つからない・すでに正しい位置なら何もしない。
+ */
+function ensureLayout_() {
+  const ss = ss_();
+  const sheet = ss.getSheetByName(SHEET_MAIN);
+  if (!sheet) return;
+  const ROWS = 40;
+
+  const scan = sheet.getRange(1, 1, Math.min(sheet.getMaxRows(), 30), Math.min(sheet.getMaxColumns(), 10)).getValues();
+  let h1 = null, h2 = null, h3 = null;
+  for (let r = 0; r < scan.length; r++) {
+    for (let c = 0; c < scan[r].length; c++) {
+      const v = String(scan[r][c] || '').trim();
+      if (!h1 && v.lastIndexOf('①', 0) === 0) h1 = { row: r + 2, col: c + 1 };
+      if (!h2 && v.lastIndexOf('②', 0) === 0) h2 = { row: r + 2, col: c + 1 };
+      if (!h3 && v.lastIndexOf('③', 0) === 0) h3 = { row: r + 2, col: c + 1 };
+    }
+  }
+  if (!h1 || !h2 || !h3) return;
+  const digestCol = h2.col + 1 === h3.col ? 8 : h2.col + 1;
+
+  const inPlace = function (name, row, col) {
+    const r = ss.getRangeByName(name);
+    return r && r.getSheet().getName() === SHEET_MAIN && r.getRow() === row && r.getColumn() === col;
+  };
+  if (
+    inPlace('KINDLE_EMAIL', h1.row, h1.col) &&
+    inPlace('NEWSLETTER_LIST', h2.row, h2.col) &&
+    inPlace('BLOG_LIST', h3.row, h3.col) &&
+    inPlace('NEWSLETTER_DIGEST_TITLES', h2.row, digestCol)
+  ) {
+    return;
+  }
+
+  // 張り替え前に週1まとめタイトルを退避（差出人アドレス→タイトル）
+  const titles = {};
+  try {
+    const oldList = ss.getRangeByName('NEWSLETTER_LIST');
+    const oldTitles = ss.getRangeByName('NEWSLETTER_DIGEST_TITLES');
+    if (oldList && oldTitles) {
+      const es = oldList.getValues();
+      const ts = oldTitles.getValues();
+      for (let i = 0; i < Math.min(es.length, ts.length); i++) {
+        const e = String(es[i][0] || '').trim();
+        const t = String(ts[i][0] || '').trim();
+        if (e && t) titles[e.toLowerCase()] = t;
+      }
+    }
+  } catch (e) { /* 退避失敗は無視（初回構築時など） */ }
+
+  ss.setNamedRange('KINDLE_EMAIL', sheet.getRange(h1.row, h1.col));
+  ss.setNamedRange('NEWSLETTER_LIST', sheet.getRange(h2.row, h2.col, ROWS, 1));
+  ss.setNamedRange('BLOG_LIST', sheet.getRange(h3.row, h3.col, ROWS, 1));
+  ss.setNamedRange('NEWSLETTER_DIGEST_TITLES', sheet.getRange(h2.row, digestCol, ROWS, 1));
+  if (digestCol === 8) sheet.hideColumns(digestCol);
+
+  // 退避したタイトルを新しい位置へ書き戻す
+  const emails = sheet.getRange(h2.row, h2.col, ROWS, 1).getValues();
+  if (Object.keys(titles).length > 0) {
+    const out = emails.map(function (r) {
+      return [titles[String(r[0] || '').trim().toLowerCase()] || ''];
+    });
+    sheet.getRange(h2.row, digestCol, ROWS, 1).setValues(out);
+  }
+  appendLog_('レイアウト', '入力欄の位置をシートの見出しに合わせて更新', '');
+}
+
 function writeBlogStatus_(row, text) {
   try {
     const range = ss_().getRangeByName('BLOG_LIST');

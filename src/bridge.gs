@@ -164,6 +164,7 @@ function bridgeSendUrl_(url, titleHint) {
  * 空き行が無いときは範囲内に1行挿入してnamed rangeごと広げる。
  */
 function bridgeUpsertRow_(rangeName, value, digestTitle) {
+  ensureLayout_();
   value = String(value || '').trim();
   if (rangeName === 'NEWSLETTER_LIST' && value.indexOf('@') === -1) {
     return { ok: false, error: 'メールアドレスの形式ではありません: ' + value };
@@ -203,6 +204,7 @@ function bridgeUpsertRow_(rangeName, value, digestTitle) {
 
 /** 購読入力エリアからの解除（Macアプリから）。行は消さずセルを空にする。 */
 function bridgeRemoveRow_(rangeName, value) {
+  ensureLayout_();
   value = String(value || '').trim();
   var range = ss_().getRangeByName(rangeName);
   if (!range) return { ok: false, error: 'シートに入力欄が見つかりません' };
