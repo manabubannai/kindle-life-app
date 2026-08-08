@@ -189,81 +189,90 @@ function ensureLayout_() {
   };
   const nlRows = usableRows(h2.row, h2.col);
   const blRows = usableRows(h3.row, h3.col);
-  if (digestCol > sheet.getMaxColumns()) {
-    sheet.insertColumnsAfter(sheet.getMaxColumns(), digestCol - sheet.getMaxColumns());
-  }
 
-  // 張り替え前に週1まとめタイトルを退避（差出人アドレス→タイトル）
-  const titles = {};
+  // 1) 掃除と入力規則の張り直し（最優先。他の処理が失敗しても必ず走らせる）
   try {
-    const oldList = ss.getRangeByName('NEWSLETTER_LIST');
-    const oldTitles = ss.getRangeByName('NEWSLETTER_DIGEST_TITLES');
-    if (oldList && oldTitles) {
-      const es = oldList.getValues();
-      const ts = oldTitles.getValues();
-      for (let i = 0; i < Math.min(es.length, ts.length); i++) {
-        const e = String(es[i][0] || '').trim();
-        const t = String(ts[i][0] || '').trim();
-        if (e && t) titles[e.toLowerCase()] = t;
-      }
-    }
-  } catch (e) { /* 退避失敗は無視（初回構築時など） */ }
-
-  ss.setNamedRange('KINDLE_EMAIL', sheet.getRange(h1.row, h1.col));
-  ss.setNamedRange('NEWSLETTER_LIST', sheet.getRange(h2.row, h2.col, nlRows, 1));
-  ss.setNamedRange('BLOG_LIST', sheet.getRange(h3.row, h3.col, blRows, 1));
-  ss.setNamedRange('NEWSLETTER_DIGEST_TITLES', sheet.getRange(h2.row, digestCol, nlRows, 1));
-  if (digestCol === 8) sheet.hideColumns(digestCol);
-
-  // 旧位置に残った入力規則の赤マークとセルメモを消し、新しい入力欄に張り直す
-  // （データの有無に関わらずグリッド全体。空セル領域に残った断片も消すため）
-  // 入力規則はグリッド全体を掃除して張り直す（メモは消さない — 手作りのヘルプを尊重）
-  const wholeGrid = sheet.getRange(1, 1, sheet.getMaxRows(), sheet.getMaxColumns());
-  wholeGrid.clearDataValidations();
-  const kindleA1 = sheet.getRange(h1.row, h1.col).getA1Notation();
-  sheet.getRange(h1.row, h1.col).setDataValidation(
-    SpreadsheetApp.newDataValidation()
-      .requireFormulaSatisfied('=OR(ISBLANK(' + kindleA1 + '),REGEXMATCH(TO_TEXT(' + kindleA1 + '),"@kindle\\.com$"))')
-      .setAllowInvalid(true)
-      .setHelpText('@kindle.com で終わるアドレスを入力してください')
-      .build()
-  );
-  const nlA1 = sheet.getRange(h2.row, h2.col).getA1Notation();
-  sheet.getRange(h2.row, h2.col, nlRows, 1).setDataValidation(
-    SpreadsheetApp.newDataValidation()
-      .requireFormulaSatisfied('=OR(ISBLANK(' + nlA1 + '),ISEMAIL(' + nlA1 + '))')
-      .setAllowInvalid(true)
-      .setHelpText('メルマガの差出人のメールアドレスを貼り付けてください')
-      .build()
-  );
-  const blA1 = sheet.getRange(h3.row, h3.col).getA1Notation();
-  sheet.getRange(h3.row, h3.col, blRows, 1).setDataValidation(
-    SpreadsheetApp.newDataValidation()
-      .requireFormulaSatisfied('=OR(ISBLANK(' + blA1 + '),REGEXMATCH(TO_TEXT(' + blA1 + '),"^https?://"))')
-      .setAllowInvalid(true)
-      .setHelpText('https:// で始まるブログのURLを入れてください')
-      .build()
-  );
-
-  // 退避したタイトルを新しい位置へ書き戻す
-  if (Object.keys(titles).length > 0) {
-    const emails = sheet.getRange(h2.row, h2.col, nlRows, 1).getValues();
-    const out = emails.map(function (r) {
-      return [titles[String(r[0] || '').trim().toLowerCase()] || ''];
-    });
-    sheet.getRange(h2.row, digestCol, nlRows, 1).setValues(out);
+    // 旧位置に残った規則の断片を全消し（データの有無に関わらずグリッド全体。メモは消さない）
+    sheet.getRange(1, 1, sheet.getMaxRows(), sheet.getMaxColumns()).clearDataValidations();
+    const kindleA1 = sheet.getRange(h1.row, h1.col).getA1Notation();
+    sheet.getRange(h1.row, h1.col).setDataValidation(
+      SpreadsheetApp.newDataValidation()
+        .requireFormulaSatisfied('=OR(ISBLANK(' + kindleA1 + '),REGEXMATCH(TO_TEXT(' + kindleA1 + '),"@kindle\\.com$"))')
+        .setAllowInvalid(true)
+        .setHelpText('@kindle.com で終わるアドレスを入力してください')
+        .build()
+    );
+    const nlA1 = sheet.getRange(h2.row, h2.col).getA1Notation();
+    sheet.getRange(h2.row, h2.col, nlRows, 1).setDataValidation(
+      SpreadsheetApp.newDataValidation()
+        .requireFormulaSatisfied('=OR(ISBLANK(' + nlA1 + '),ISEMAIL(' + nlA1 + '))')
+        .setAllowInvalid(true)
+        .setHelpText('メルマガの差出人のメールアドレスを貼り付けてください')
+        .build()
+    );
+    const blA1 = sheet.getRange(h3.row, h3.col).getA1Notation();
+    sheet.getRange(h3.row, h3.col, blRows, 1).setDataValidation(
+      SpreadsheetApp.newDataValidation()
+        .requireFormulaSatisfied('=OR(ISBLANK(' + blA1 + '),REGEXMATCH(TO_TEXT(' + blA1 + '),"^https?://"))')
+        .setAllowInvalid(true)
+        .setHelpText('https:// で始まるブログのURLを入れてください')
+        .build()
+    );
+  } catch (e) {
+    console.error('入力規則の張り直し失敗: ' + e);
   }
-  // メインタブ以外（説明用など）: 貼り付けで紛れ込んだ入力規則・メモを掃除し、
-  // 誤編集防止の保護をかける（編集しようとすると警告）
-  ss.getSheets().forEach(function (sh) {
-    if (sh.getName() === SHEET_MAIN) return;
-    const grid = sh.getRange(1, 1, sh.getMaxRows(), sh.getMaxColumns());
-    grid.clearDataValidations();
-    grid.clearNote();
-    if (sh.getProtections(SpreadsheetApp.ProtectionType.SHEET).length === 0) {
-      sh.protect().setWarningOnly(true).setDescription('Kindle Life: このタブは編集不要です');
+
+  // 2) named range の張り直し（週1まとめタイトルの退避・復元つき）
+  try {
+    if (digestCol > sheet.getMaxColumns()) {
+      sheet.insertColumnsAfter(sheet.getMaxColumns(), digestCol - sheet.getMaxColumns());
     }
-  });
+    const titles = {};
+    try {
+      const oldList = ss.getRangeByName('NEWSLETTER_LIST');
+      const oldTitles = ss.getRangeByName('NEWSLETTER_DIGEST_TITLES');
+      if (oldList && oldTitles) {
+        const es = oldList.getValues();
+        const ts = oldTitles.getValues();
+        for (let i = 0; i < Math.min(es.length, ts.length); i++) {
+          const e = String(es[i][0] || '').trim();
+          const t = String(ts[i][0] || '').trim();
+          if (e && t) titles[e.toLowerCase()] = t;
+        }
+      }
+    } catch (e) { /* 退避失敗は無視（初回構築時など） */ }
+
+    ss.setNamedRange('KINDLE_EMAIL', sheet.getRange(h1.row, h1.col));
+    ss.setNamedRange('NEWSLETTER_LIST', sheet.getRange(h2.row, h2.col, nlRows, 1));
+    ss.setNamedRange('BLOG_LIST', sheet.getRange(h3.row, h3.col, blRows, 1));
+    ss.setNamedRange('NEWSLETTER_DIGEST_TITLES', sheet.getRange(h2.row, digestCol, nlRows, 1));
+    if (digestCol === 8) sheet.hideColumns(digestCol);
+
+    if (Object.keys(titles).length > 0) {
+      const emails = sheet.getRange(h2.row, h2.col, nlRows, 1).getValues();
+      const out = emails.map(function (r) {
+        return [titles[String(r[0] || '').trim().toLowerCase()] || ''];
+      });
+      sheet.getRange(h2.row, digestCol, nlRows, 1).setValues(out);
+    }
+  } catch (e) {
+    console.error('named rangeの張り直し失敗: ' + e);
+  }
+
+  // 3) メインタブ以外（説明用など）: 紛れ込んだ規則・メモの掃除と誤編集防止の保護
+  try {
+    ss.getSheets().forEach(function (sh) {
+      if (sh.getName() === SHEET_MAIN) return;
+      const grid = sh.getRange(1, 1, sh.getMaxRows(), sh.getMaxColumns());
+      grid.clearDataValidations();
+      grid.clearNote();
+      if (sh.getProtections(SpreadsheetApp.ProtectionType.SHEET).length === 0) {
+        sh.protect().setWarningOnly(true).setDescription('Kindle Life: このタブは編集不要です');
+      }
+    });
+  } catch (e) {
+    console.error('サブタブの掃除・保護失敗: ' + e);
+  }
 
   appendLog_('レイアウト', '入力欄の位置をシートの見出しに合わせて更新', '');
 }
