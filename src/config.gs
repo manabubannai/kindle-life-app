@@ -208,8 +208,9 @@ function ensureLayout_() {
   ss.setNamedRange('NEWSLETTER_DIGEST_TITLES', sheet.getRange(h2.row, digestCol, ROWS, 1));
   if (digestCol === 8) sheet.hideColumns(digestCol);
 
-  // 旧位置に残った入力規則の赤マークを消し、新しい入力欄に張り直す
+  // 旧位置に残った入力規則の赤マークとセルメモを消し、新しい入力欄に張り直す
   sheet.getDataRange().clearDataValidations();
+  sheet.getDataRange().clearNote();
   const kindleA1 = sheet.getRange(h1.row, h1.col).getA1Notation();
   sheet.getRange(h1.row, h1.col).setDataValidation(
     SpreadsheetApp.newDataValidation()
