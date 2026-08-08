@@ -7,6 +7,9 @@
  */
 
 function onOpen() {
+  // レイアウト変更（見出し①〜③の移動）に入力欄・入力規則を自動で追従させる。
+  // 認証前のシンプルトリガーでも SpreadsheetApp だけなら動く。失敗しても無視。
+  try { ensureLayout_(); } catch (e) {}
   SpreadsheetApp.getUi()
     .createMenu('Kindle Life')
     .addItem('① 初期セットアップ（最初に1回）', 'initialSetup')
