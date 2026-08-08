@@ -39,7 +39,8 @@ function collectNewsletters_(config, state, budget) {
       items.push({
         kind: 'newsletter',
         id: id,
-        title: message.getSubject() || '(無題)',
+        // 転送メールの「Fwd:」等はKindleの書名から外す
+        title: String(message.getSubject() || '(無題)').replace(/^(?:\s*(?:fwd?|re|転送)\s*:\s*)+/i, '') || '(無題)',
         source: senderDisplayName_(message.getFrom()),
         dateMs: message.getDate().getTime(),
         dateStr: Utilities.formatDate(message.getDate(), timeZone_(), 'M/d HH:mm'),
