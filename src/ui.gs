@@ -17,8 +17,6 @@ function onOpen() {
     .addItem('⏰ 新着を今すぐ送信', 'runDeliveryNow')
     .addItem('🧑‍⚕️ バグを診断する', 'runDiagnostics')
     .addSeparator()
-    .addItem('🧑‍💻 Macアプリと連携', 'showBridgeInfo')
-    .addSeparator()
     .addItem('⏸ このシートを停止（トリガー削除）', 'stopAll')
     .addToUi();
 }
